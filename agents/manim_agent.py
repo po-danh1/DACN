@@ -204,7 +204,7 @@ Generate scene plans that will create clear, educational animations for the give
    - Avoid complex coordinate math; prefer simple shifts.
 
 6. **Colors (Built-ins Only)**
-   - Use constants: `WHITE, BLACK, RED, GREEN, BLUE, YELLOW, ORANGE, PURPLE, PINK`
+   - Use constants: `WHITE, BLACK, RED, GREEN, BLUE, YELLOW, ORANGE, PURPLE, PINK` - DO NOT USE CYAN EVER
    - Example: `Text("Hello", color=BLUE)`
 
 7. **Flow (Minimal & Clear)**

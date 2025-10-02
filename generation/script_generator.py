@@ -139,6 +139,8 @@ class ScriptGenerator:
 - Minimum 3 seconds per subtitle for natural speech
 - Align narration timing with visual events
 - Make explanations educational and engaging
+- Each segment should short, avoid long and unnecessary statements.
+- Segments timeline should not be too close together, give them 1 to 2 seconds before starting a new one 
 
 **SRT FORMAT EXAMPLES**:
 <srt>
