@@ -408,7 +408,7 @@ If you use STEMViz in your research or project, please cite:
 
 ```bibtex
 @software{stemviz2025,
-  author = {Nguyen, Quang},
+  author = {Nguyen, Quan},
   title = {STEMViz: AI-Powered STEM Concept Visualizer},
   year = {2025},
   url = {https://github.com/qnguyen3/STEMViz}
