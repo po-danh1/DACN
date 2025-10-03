@@ -80,7 +80,7 @@ class Settings(BaseSettings):
 
     # Audio Synthesis Settings
     tts_voice_id: str = "Qggl4b0xRMiqOwhPtVWT"
-    tts_model_id: str = "eleven_flash_v2_5"
+    tts_model_id: str = "eleven_v3"
     tts_stability: float = 0.75
     tts_similarity_boost: float = 0.75
     tts_style: float = 0.0
