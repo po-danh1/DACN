@@ -72,6 +72,8 @@ class ScriptGenerator:
 
 **VIDEO CONTEXT**: This is a mathematical/STEM educational animation explaining a concept step-by-step. The animation was generated to help students understand complex visual ideas.
 
+**TARGET LANGUAGE**: {target_language}
+
 **YOUR GUIDELINES**:
 
 1. **Watch Carefully**: Analyze the entire video to understand:
@@ -164,12 +166,13 @@ This process continues until the array is fully sorted.
 
 Now analyze the video and generate the narration script following these exact requirements."""
 
-    def execute(self, video_path: str) -> ScriptResult:
+    def execute(self, video_path: str, target_language: str = "English") -> ScriptResult:
         """
         Generate narration script for a silent animation video
 
         Args:
             video_path: Path to the silent animation video file
+            target_language: Target language for narration (English, Chinese, Spanish, Vietnamese)
 
         Returns:
             ScriptResult with generated SRT content and metadata
@@ -188,7 +191,7 @@ Now analyze the video and generate the narration script following these exact re
             self.logger.info(f"Video duration: {video_duration:.2f} seconds")
 
             # Generate script using Gemini
-            srt_content = self._generate_script_with_gemini(video_file)
+            srt_content = self._generate_script_with_gemini(video_file, target_language)
 
             if srt_content:
                 # Parse and validate SRT content
@@ -225,7 +228,7 @@ Now analyze the video and generate the narration script following these exact re
                 model_used=self.model
             )
 
-    def _generate_script_with_gemini(self, video_file: Path) -> Optional[str]:
+    def _generate_script_with_gemini(self, video_file: Path, target_language: str = "English") -> Optional[str]:
         """Generate script using Gemini 2.5 Flash"""
 
         for attempt in range(self.max_retries):
@@ -250,10 +253,11 @@ Now analyze the video and generate the narration script following these exact re
                 self.logger.info(f"File uploaded successfully: {uploaded_file.name}")
 
                 # Generate script with Gemini
-                self.logger.info(f"Generating script with {self.model}")
+                self.logger.info(f"Generating script with {self.model} in {target_language}")
+                prompt = self.SCRIPT_GENERATION_PROMPT.format(target_language=target_language)
                 response = self.client.models.generate_content(
                     model=self.model,
-                    contents=[uploaded_file, self.SCRIPT_GENERATION_PROMPT],
+                    contents=[uploaded_file, prompt],
                     config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=1024))
                 )
 
