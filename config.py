@@ -3,6 +3,8 @@ from pydantic import Field
 from pathlib import Path
 from typing import Optional
 
+from concurrent.futures import interpreter
+
 
 class Settings(BaseSettings):
     # API Keys
@@ -63,9 +65,12 @@ class Settings(BaseSettings):
     manim_max_retries: int = 3
     manim_max_scene_duration: float = 30.0  # seconds
     manim_total_video_duration_target: float = 120.0  # seconds
+    
+    # Reasoning setting
+    interpreter_reasoning_tokens: Optional[int] = 2048
+    animation_reasoning_tokens: Optional[int] = 4096
 
     # Animation generation settings
-    animation_reasoning_tokens: Optional[float] = 2048
     animation_temperature: float = 0.7
     animation_max_retries_per_scene: int = 3
     animation_enable_simplification: bool = True

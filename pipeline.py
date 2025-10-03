@@ -29,7 +29,7 @@ class Pipeline:
             api_key=settings.openrouter_api_key,
             base_url=settings.openrouter_base_url,
             model=settings.reasoning_model,
-            reasoning_tokens=settings.animation_reasoning_tokens
+            reasoning_tokens=settings.interpreter_reasoning_tokens
         )
 
         # Initialize Manim Agent

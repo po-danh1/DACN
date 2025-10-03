@@ -234,7 +234,9 @@ Generate scene plans that will create clear, educational animations for the give
 - Only `Text`, `Tex`, `MathTex`, basic 2D shapes, `NumberPlane`/`Axes`
 - Only `Write`, `Create`, `FadeIn/Out`, `Transform`, `ReplacementTransform`, `Indicate`, and simple `.animate`
 - No updaters/ValueTracker/camera edits/external assets/3D/experimental APIs
-- Stepwise reveal with short waits; ends with `self.wait(2)`
+- Stepwise reveal with short waits; ends with `self.wait(3)`
+- Please make slow animation for the narrator to have enough time to explain the concept, do not make animation and scene switching too fast
+- Wait a bit between each step of the animation
 - Make sure that all the elements are place correctly, not overlapping or being overflown on the screen
 - Code is clean, minimal, and executable in Manim CE v0.19
 - For text/animated text please be careful with the position where we put it, avoid having the text overlapping with other elements on the screen
