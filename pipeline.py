@@ -28,7 +28,8 @@ class Pipeline:
         self.concept_interpreter = ConceptInterpreterAgent(
             api_key=settings.openrouter_api_key,
             base_url=settings.openrouter_base_url,
-            model=settings.reasoning_model
+            model=settings.reasoning_model,
+            reasoning_tokens=settings.animation_reasoning_tokens
         )
 
         # Initialize Manim Agent
@@ -38,7 +39,6 @@ class Pipeline:
             frame_rate=settings.manim_frame_rate,
             max_scene_duration=settings.manim_max_scene_duration,
             total_video_duration_target=settings.manim_total_video_duration_target,
-            reasoning_effort=settings.animation_reasoning_effort,
             temperature=settings.animation_temperature,
             max_retries_per_scene=settings.animation_max_retries_per_scene,
             enable_simplification=settings.animation_enable_simplification,
@@ -50,7 +50,8 @@ class Pipeline:
             base_url=settings.openrouter_base_url,
             model=settings.reasoning_model,
             output_dir=settings.output_dir,
-            config=animation_config
+            config=animation_config,
+            reasoning_tokens=settings.animation_reasoning_tokens
         )
 
         # Initialize Script Generator (Phase 3)

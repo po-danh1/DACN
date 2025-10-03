@@ -6,12 +6,9 @@ import tempfile
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
-
-try:
-    from google import genai
-except ImportError:
-    # Fallback for older google-genai versions
-    import google.generativeai as genai
+from google import genai
+from google.genai import types
+    
 from pydantic import BaseModel, Field
 
 
@@ -137,7 +134,7 @@ class ScriptGenerator:
 - Every subtitle MUST be a complete sentence
 - Use proper SRT timestamp format (HH:MM:SS,mmm) with COMMA separator and leading zeros
 - Minimum 3 seconds per subtitle for natural speech
-- Align narration timing with visual events
+- Make sure that the timestamp and the generated narative MUST MATCH the visual element being shown, not too early, not too late.
 - Make explanations educational and engaging
 - Each segment should short, avoid long and unnecessary statements.
 - Segments timeline should not be too close together, give them 1 to 2 seconds before starting a new one 
@@ -256,7 +253,8 @@ Now analyze the video and generate the narration script following these exact re
                 self.logger.info(f"Generating script with {self.model}")
                 response = self.client.models.generate_content(
                     model=self.model,
-                    contents=[uploaded_file, self.SCRIPT_GENERATION_PROMPT]
+                    contents=[uploaded_file, self.SCRIPT_GENERATION_PROMPT],
+                    config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=1024))
                 )
 
                 script_content = response.text

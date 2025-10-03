@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from openai import OpenAI
+import requests
 import logging
 import time
 import json
@@ -10,10 +10,11 @@ from typing import Optional, Dict, Any
 class BaseAgent(ABC):
     """Base class for all AI agents using OpenRouter"""
 
-    def __init__(self, api_key: str, base_url: str, model: str, reasoning_effort: Optional[str] = None):
-        self.client = OpenAI(api_key=api_key, base_url=base_url)
+    def __init__(self, api_key: str, base_url: str, model: str, reasoning_tokens: Optional[float] = None):
+        self.api_key = api_key
+        self.base_url = base_url.rstrip('/')
         self.model = model
-        self.reasoning_effort = reasoning_effort
+        self.reasoning_tokens = reasoning_tokens
         self.logger = logging.getLogger(self.__class__.__name__)
         self.total_tokens = 0
         self.prompt_tokens = 0
@@ -27,7 +28,7 @@ class BaseAgent(ABC):
         max_retries: int = 3,
         json_mode: bool = False,
     ) -> str:
-        """Call LLM with retry logic and error handling"""
+        """Call LLM with retry logic and error handling using HTTPS API"""
 
         for attempt in range(max_retries):
             try:
@@ -36,27 +37,41 @@ class BaseAgent(ABC):
                     {"role": "user", "content": user_message},
                 ]
 
-                kwargs = {
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                }
+
+                payload = {
                     "model": self.model,
                     "messages": messages,
                     "temperature": temperature,
                 }
 
-                if self.reasoning_effort is not None and self.reasoning_effort != "":
-                    kwargs["reasoning_effort"] = self.reasoning_effort
+                if self.reasoning_tokens is not None:
+                    payload["reasoning"] = {"max_tokens": int(self.reasoning_tokens)}
 
                 if json_mode:
-                    kwargs["response_format"] = {"type": "json_object"}
+                    payload["response_format"] = {"type": "json_object"}
 
-                response = self.client.chat.completions.create(**kwargs)
+                url = f"{self.base_url}/chat/completions"
+                
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    json=payload,
+                    timeout=120
+                )
+                
+                response.raise_for_status()
+                response_data = response.json()
 
-                # Track token usage
-                if hasattr(response, "usage"):
-                    self.prompt_tokens += response.usage.prompt_tokens
-                    self.completion_tokens += response.usage.completion_tokens
-                    self.total_tokens += response.usage.total_tokens
+                if "usage" in response_data:
+                    self.prompt_tokens += response_data["usage"].get("prompt_tokens", 0)
+                    self.completion_tokens += response_data["usage"].get("completion_tokens", 0)
+                    self.total_tokens += response_data["usage"].get("total_tokens", 0)
 
-                content = response.choices[0].message.content
+                content = response_data["choices"][0]["message"]["content"]
                 self.logger.info(f"LLM call successful (attempt {attempt + 1})")
 
                 return content
@@ -67,7 +82,7 @@ class BaseAgent(ABC):
                 )
 
                 if attempt < max_retries - 1:
-                    wait_time = 2**attempt  # Exponential backoff
+                    wait_time = 2**attempt
                     time.sleep(wait_time)
                 else:
                     raise Exception(

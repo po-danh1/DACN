@@ -31,9 +31,9 @@ class ManimAgent(BaseAgent):
         model: str,
         output_dir: Path,
         config: Optional[AnimationConfig] = None,
-        reasoning_effort: Optional[str] = None
+        reasoning_tokens: Optional[float] = None
     ):
-        super().__init__(api_key=api_key, base_url=base_url, model=model, reasoning_effort=reasoning_effort)
+        super().__init__(api_key=api_key, base_url=base_url, model=model, reasoning_tokens=reasoning_tokens)
         self.output_dir = Path(output_dir)
         self.config = config or AnimationConfig()
 
@@ -686,7 +686,7 @@ class {class_name}(Scene):
         return {
             "token_usage": self.get_token_usage(),
             "model_used": self.model,
-            "reasoning_effort": self.reasoning_effort,
+            "reasoning_tokens": self.reasoning_tokens,
             "config": self.config.model_dump(),
             "renderer_status": "ready" if self.renderer.validate_manim_installation() else "not_ready"
         }

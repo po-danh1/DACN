@@ -1,10 +1,9 @@
 import logging
 import time
-import tempfile
-import subprocess
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List
 from datetime import datetime
+from pydub import AudioSegment as PydubAudioSegment
 
 try:
     from elevenlabs.client import ElevenLabs
@@ -334,7 +333,7 @@ class AudioSynthesizer:
         return filepath
 
     def _concatenate_audio_segments(self, audio_segments: List[AudioSegment], script_stem: str) -> Path:
-        """Concatenate audio segments with proper timing based on SRT timestamps"""
+        """Concatenate audio segments with proper timing using pydub"""
 
         if not audio_segments:
             raise ValueError("No audio segments to concatenate")
@@ -347,157 +346,53 @@ class AudioSynthesizer:
         output_filename = f"{script_stem}_audio_{timestamp}.mp3"
         output_path = self.output_dir / output_filename
 
-        silence_files = []
-        concat_list = []
+        combined = PydubAudioSegment.silent(duration=0)
+        current_time = 0.0
 
-        try:
-            current_time = 0.0
+        for i, segment in enumerate(audio_segments):
+            if not segment.audio_path:
+                continue
 
-            for i, segment in enumerate(audio_segments):
-                if not segment.audio_path:
-                    continue
+            gap = segment.start_time - current_time
 
-                gap = segment.start_time - current_time
+            if gap > 0.05:
+                silence_duration_ms = int(gap * 1000)
+                combined += PydubAudioSegment.silent(duration=silence_duration_ms)
+                self.logger.debug(f"Added {gap:.2f}s silence before segment {i+1}")
 
-                if gap > 0.05:
-                    silence_path = self.output_dir / f"silence_{timestamp}_{i}.mp3"
-                    silence_files.append(silence_path)
-                    self._create_silence_file(silence_path, gap)
-                    concat_list.append(f"file '{silence_path.resolve()}'\n")
-                    self.logger.debug(f"Added {gap:.2f}s silence before segment {i+1}")
+            audio_clip = PydubAudioSegment.from_mp3(segment.audio_path)
+            combined += audio_clip
+            current_time = segment.start_time + (segment.duration or 0)
 
-                concat_list.append(f"file '{Path(segment.audio_path).resolve()}'\n")
-                current_time = segment.start_time + (segment.duration or 0)
+        combined.export(output_path, format="mp3", bitrate="192k")
+        self.logger.info(f"Successfully concatenated audio with timing: {output_filename}")
+        return output_path
 
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as concat_file:
-                concat_file.writelines(concat_list)
-                concat_file_path = concat_file.name
 
-            cmd = [
-                "ffmpeg", "-y",
-                "-f", "concat",
-                "-safe", "0",
-                "-i", concat_file_path,
-                "-c:a", "libmp3lame",
-                "-b:a", "192k",
-                "-ar", "44100",
-                str(output_path)
-            ]
-
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout + 60
-            )
-
-            if result.returncode == 0 and output_path.exists():
-                self.logger.info(f"Successfully concatenated audio with timing: {output_filename}")
-                return output_path
-            else:
-                self.logger.error(f"FFmpeg concatenation failed: {result.stderr}")
-                raise RuntimeError(f"Audio concatenation failed: {result.stderr}")
-
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("Audio concatenation timed out")
-        finally:
-            try:
-                Path(concat_file_path).unlink()
-            except:
-                pass
-            for silence_file in silence_files:
-                try:
-                    silence_file.unlink()
-                except:
-                    pass
-
-    def _create_silence_file(self, output_path: Path, duration: float):
-        """Create a silent audio file of specified duration"""
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "lavfi",
-            "-i", "anullsrc=r=44100:cl=mono",
-            "-t", str(duration),
-            "-c:a", "libmp3lame",
-            "-b:a", "192k",
-            "-ar", "44100",
-            str(output_path)
-        ]
-        
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode != 0:
-            raise RuntimeError(f"Failed to create silence file: {result.stderr}")
 
     def _add_silence_padding(self, audio_path: Path, padding_duration: float) -> Path:
         """Add silence padding to match target duration"""
 
         self.logger.info(f"Adding {padding_duration:.2f}s silence padding")
 
-        # Generate new filename
-        original_name = audio_path.stem
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        padded_filename = f"{original_name}_padded_{timestamp}.mp3"
+        padded_filename = f"{audio_path.stem}_padded_{timestamp}.mp3"
         padded_path = self.output_dir / padded_filename
 
-        # Create silence file
-        silence_path = self.output_dir / f"silence_{timestamp}.mp3"
-        silence_cmd = [
-            "ffmpeg",
-            "-y",
-            "-f", "lavfi",
-            "-i", f"anullsrc=r=44100:cl=mono",
-            "-t", str(padding_duration),
-            "-c:a", "mp3",
-            str(silence_path)
-        ]
-
-        subprocess.run(silence_cmd, capture_output=True, check=True)
-
-        # Concatenate original audio with silence
-        concat_cmd = [
-            "ffmpeg",
-            "-y",
-            "-i", str(audio_path),
-            "-i", str(silence_path),
-            "-filter_complex", "[0:a][1:a]concat=n=2:v=0:a=1[out]",
-            "-map", "[out]",
-            "-c:a", "mp3",
-            str(padded_path)
-        ]
-
-        subprocess.run(concat_cmd, capture_output=True, check=True)
-
-        # Clean up silence file
-        silence_path.unlink()
+        audio = PydubAudioSegment.from_mp3(audio_path)
+        silence = PydubAudioSegment.silent(duration=int(padding_duration * 1000))
+        padded_audio = audio + silence
+        padded_audio.export(padded_path, format="mp3", bitrate="192k")
 
         self.logger.info(f"Added silence padding: {padded_filename}")
         return padded_path
 
     def _get_audio_duration(self, audio_path: Path) -> Optional[float]:
-        """Get audio duration using ffprobe"""
+        """Get audio duration using pydub"""
 
         try:
-            cmd = [
-                "ffprobe",
-                "-v", "quiet",
-                "-print_format", "default=nokey=1:noprint_wrappers=1",
-                "-show_entries", "format=duration",
-                str(audio_path)
-            ]
-
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-
-            if result.returncode == 0:
-                return float(result.stdout.strip())
-            else:
-                self.logger.warning(f"ffprobe failed for {audio_path}: {result.stderr}")
-                return None
-
+            audio = PydubAudioSegment.from_mp3(audio_path)
+            return len(audio) / 1000.0
         except Exception as e:
             self.logger.warning(f"Could not get audio duration for {audio_path}: {e}")
             return None

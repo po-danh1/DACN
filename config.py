@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # Model Selection (OpenRouter model IDs)
     reasoning_model: str = "anthropic/claude-sonnet-4.5"
-    multimodal_model: str = "gemini-flash-latest"
+    multimodal_model: str = "gemini-2.5-pro"
 
     # TTS Configuration
     tts_voice_id: str = "default"
@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     manim_total_video_duration_target: float = 120.0  # seconds
 
     # Animation generation settings
-    animation_reasoning_effort: Optional[str] = None
+    animation_reasoning_tokens: Optional[float] = 2048
     animation_temperature: float = 0.7
     animation_max_retries_per_scene: int = 3
     animation_enable_simplification: bool = True

@@ -14,3 +14,5 @@ scene_*.py
 output/.DS_Store
 CLAUDE.md
 CRUSH.md
+media
+output

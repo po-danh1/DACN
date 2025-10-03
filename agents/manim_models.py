@@ -76,7 +76,6 @@ class AnimationConfig(BaseModel):
     total_video_duration_target: float = 120.0
 
     max_retries_per_scene: int = 3
-    reasoning_effort: Optional[str] = None
     temperature: float = 0.7
 
     render_timeout: int = 300

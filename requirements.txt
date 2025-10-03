@@ -3,8 +3,8 @@ gradio>=4.0.0
 # Animation
 manim>=0.18.0
 
-# LLM Access (unified via OpenRouter)
-openai>=1.0.0
+# LLM Access (unified via OpenRouter - using HTTPS API)
+requests>=2.31.0
 
 # Multimodal LLM (Google Gemini)
 google-genai>=0.8.0
@@ -12,8 +12,9 @@ google-genai>=0.8.0
 # TTS
 elevenlabs>=1.0.0
 
-# Video Processing
+# Audio/Video Processing
 ffmpeg-python>=0.2.0
+pydub>=0.25.1
 
 # SRT/Subtitle Processing
 webvtt-py>=0.5.0
@@ -22,6 +23,3 @@ webvtt-py>=0.5.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
-
-# Utilities
-requests>=2.31.0
