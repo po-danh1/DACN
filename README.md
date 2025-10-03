@@ -243,8 +243,8 @@ Display in Gradio
 - **UI**: Gradio
 - **Animation**: Manim Community Edition
 - **LLMs**: 
-  - Reasoning: Claude Sonnet 4 via OpenRouter
-  - Multimodal: Gemini 2.0 Flash
+  - Reasoning: Claude Sonnet 4.5 via OpenRouter
+  - Multimodal: Gemini 2.5 Flash
 - **TTS**: ElevenLabs
 - **Media Processing**: FFmpeg
 
@@ -419,7 +419,7 @@ If you use STEMViz in your research or project, please cite:
 
 ## Contact
 
-**Quang Nguyen** - [@qnguyen3](https://github.com/qnguyen3)
+**Quan Nguyen** - [@qnguyen3](https://github.com/qnguyen3)
 
 Project Link: [https://github.com/qnguyen3/STEMViz](https://github.com/qnguyen3/STEMViz)
 
