@@ -1,14 +1,16 @@
+import os
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 
 class Settings(BaseSettings):
     # API Keys
-    openrouter_api_key: str = Field(..., env="OPENROUTER_API_KEY")
-    google_api_key: str = Field(..., env="GOOGLE_API_KEY")
-    elevenlabs_api_key: str = Field(..., env="ELEVENLABS_API_KEY")
+    openrouter_api_key: str
+    google_api_key: str
+    elevenlabs_api_key: str
+    openai_api_key: str
 
     # OpenRouter Configuration
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
@@ -17,8 +19,27 @@ class Settings(BaseSettings):
     reasoning_model: str = "anthropic/claude-sonnet-4.5"
     multimodal_model: str = "gemini-2.5-pro"
 
-    # TTS Configuration
-    tts_voice_id: str = "default"
+    # TTS Provider Selection
+    tts_provider: str = "elevenlabs"  # "elevenlabs", "openai"
+
+    # ElevenLabs Settings (used when tts_provider="elevenlabs")
+    elevenlabs_voice_id: str = "JBFqnCBsd6RMkjVDRZzb"
+    elevenlabs_model_id: str = "eleven_multilingual_v2"
+    elevenlabs_stability: float = 0.75
+    elevenlabs_similarity_boost: float = 0.75
+    elevenlabs_style: float = 0.0
+    elevenlabs_use_speaker_boost: bool = True
+
+    # OpenAI Settings (used when tts_provider="openai")
+    openai_voice: str = "alloy"
+    openai_model: str = "tts-1"
+    openai_endpoint: str = ""
+    openai_response_format: str = "mp3"
+    openai_speed: float = 1.0
+
+    # Common TTS Settings
+    tts_max_retries: int = 3
+    tts_timeout: int = 120  # seconds
 
     # Paths
     output_dir: Path = Path("output")
@@ -63,7 +84,7 @@ class Settings(BaseSettings):
     manim_max_retries: int = 3
     manim_max_scene_duration: float = 30.0  # seconds
     manim_total_video_duration_target: float = 120.0  # seconds
-    
+
     # Reasoning setting
     interpreter_reasoning_tokens: Optional[int] = 2048
     animation_reasoning_tokens: Optional[int] = 4096
@@ -78,15 +99,7 @@ class Settings(BaseSettings):
     script_generation_max_retries: int = 3
     script_generation_timeout: int = 180  # seconds
 
-    # Audio Synthesis Settings
-    tts_voice_id: str = "JBFqnCBsd6RMkjVDRZzb"
-    tts_model_id: str = "eleven_multilingual_v2"
-    tts_stability: float = 0.75
-    tts_similarity_boost: float = 0.75
-    tts_style: float = 0.0
-    tts_use_speaker_boost: bool = True
-    tts_max_retries: int = 3
-    tts_timeout: int = 120  # seconds
+
 
     # Video Settings
     video_codec: str = "libx264"
@@ -115,6 +128,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "allow"  # Allow extra fields from environment
 
     def create_directories(self):
         """Create all output directories if they don't exist"""
@@ -133,5 +147,12 @@ class Settings(BaseSettings):
 
 
 # Initialize settings and create directories
-settings = Settings()
+# Note: Settings will be initialized with environment variables
+# Use Settings() in your code to get the configuration
+def get_settings():
+    """Get settings instance with environment variables"""
+    return Settings()
+
+
+settings = get_settings()
 settings.create_directories()
