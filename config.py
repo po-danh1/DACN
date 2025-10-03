@@ -3,8 +3,6 @@ from pydantic import Field
 from pathlib import Path
 from typing import Optional
 
-from concurrent.futures import interpreter
-
 
 class Settings(BaseSettings):
     # API Keys
