@@ -359,21 +359,6 @@ STEMViz/
 └── requirements.txt         # Python dependencies
 ```
 
-### Running Tests
-
-```bash
-# Test individual components
-python test_phase1.py   # Concept interpretation
-python test_phase2.py   # Animation generation
-python test_phase3.py   # Script + audio synthesis
-python test_phase4.py   # Full pipeline
-
-# Test specific concepts
-python test_bubble_sort.py
-python test_gradient_descent.py
-python test_bayes.py
-```
-
 ---
 
 ## Contributing
