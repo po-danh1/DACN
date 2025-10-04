@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     tts_provider: str = "elevenlabs"  # "elevenlabs", "openai"
 
     # ElevenLabs Settings (used when tts_provider="elevenlabs")
-    elevenlabs_voice_id: str = "JBFqnCBsd6RMkjVDRZzb"
-    elevenlabs_model_id: str = "eleven_multilingual_v2"
+    elevenlabs_voice_id: str = "Qggl4b0xRMiqOwhPtVWT"
+    elevenlabs_model_id: str = "eleven_v3"
     elevenlabs_stability: float = 0.75
     elevenlabs_similarity_boost: float = 0.75
     elevenlabs_style: float = 0.0
