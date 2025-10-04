@@ -63,8 +63,8 @@ class ManimAgent(BaseAgent):
 **ANIMATION GUIDELINES**:
 
 1. **Scene Structure**:
-   - Create 1-2 scenes per sub-concept (maximum 8 scenes total)
-   - Each scene should be 15-45 seconds long
+   - Create 1–2 scenes per sub-concept (maximum 8 scenes total)
+   - Each scene should be 30–45 seconds long
    - Build scenes logically following sub-concept dependencies
    - Start with foundations, progressively add complexity
 
@@ -72,20 +72,43 @@ class ManimAgent(BaseAgent):
    - Use clear, educational visual style (dark background, bright elements)
    - Include mathematical notation, equations, diagrams
    - Show relationships and transformations visually
-   - Use color coding for consistency (e.g., blue for known, green for new, red for important)
+   - Use color coding consistently:
+     - Blue (#3B82F6) for known/assumed quantities
+     - Green (#22C55E) for newly introduced concepts
+     - Red (#EF4444) for key/important results or warnings
 
-3. **Animation Types**:
-   - Write/Create: Text, equations appearing
-   - Transform/Replace: Mathematical transformations
-   - Fade In/Out: Elements appearing/disappearing
-   - Move/Highlight: Drawing attention to key elements
-   - Grow/Shrink: Emphasizing scale or importance
+3. **Consistency & Continuity (VERY IMPORTANT)**:
+   - If an illustrative example is used to demonstrate the concept (e.g., a specific array for a sorting algorithm, a fixed probability scenario, a single graph), **use the exact same example and values across all scenes** unless a scene explicitly explores a variant. 
+   - Keep element IDs and targets stable across scenes (e.g., "example_array", "disease_prevalence_box") to preserve continuity.
+   - Reuse and transform existing elements instead of recreating them where possible.
 
-4. **Educational Flow**:
+4. **Animation Types**:
+   - write / create: introduce text, equations, axes, or diagrams
+   - transform / replace: mathematical transformations, substitutions, rearrangements
+   - fade_in / fade_out: introduce or remove elements
+   - move / highlight: focus attention
+   - grow / shrink: emphasize scale or importance
+   - **wait**: insert a timed pause with nothing changing on screen (used for narration beats)
+
+5. **Pacing & Narration Cues**:
+   - Animations should be **slow and deliberate**. After each significant action (write, transform, highlight, etc.), insert a **wait** action of 1.5–3.0 seconds for narration.
+   - Typical durations (guideline, adjust as needed):
+     - write/create (short text/equation): 4–5s
+     - transform/replace (equation/diagram): 8-19s
+     - move/highlight: 3-5s
+     - fade_in/out: 2-5s
+     - wait (narration): 2-4s
+   - Prefer easing that reads smoothly (ease-in-out). Include `"parameters": {"easing": "ease_in_out"}` when relevant.
+
+6. **Educational Flow**:
    - Start with context/overview
    - Introduce new elements step-by-step
-   - Show relationships and connections
-   - End with key takeaways or summaries
+   - Show relationships and connections visually
+   - End with key takeaways or summaries, keeping the same example visible to reinforce learning
+
+7. **Element Naming**:
+   - Use descriptive, stable targets (e.g., "bayes_equation", "likelihood_label", "frequency_grid") reused across scenes.
+   - When transforming, specify `"parameters": {"from": "<old_target>", "to": "<new_target>"}` where helpful.
 
 **OUTPUT FORMAT**:
 Return ONLY valid JSON matching this exact structure:
@@ -111,14 +134,14 @@ Return ONLY valid JSON matching this exact structure:
     ]
 }}
 
-**EXAMPLE** for Bayes' Theorem:
+**EXAMPLE** for Bayes' Theorem (consistent example across all scenes: medical test with 1% prevalence, 90% sensitivity, 95% specificity):
 {{
     "scene_plans": [
         {{
-            "id": "introduction",
-            "title": "Bayes' Theorem Introduction",
-            "description": "Introduce Bayes' theorem and its components with visual setup",
-            "sub_concept_id": "prior_probability",
+            "id": "intro_context",
+            "title": "Bayes' Theorem: Context & Setup",
+            "description": "Introduce the medical testing example and define prior, sensitivity, and specificity.",
+            "sub_concept_id": "context_prior",
             "actions": [
                 {{
                     "action_type": "fade_in",
@@ -129,141 +152,477 @@ Return ONLY valid JSON matching this exact structure:
                     "parameters": {{"text": "Bayes' Theorem", "color": "#FFFFFF"}}
                 }},
                 {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Narration pause after title",
+                    "target": "narration_pause_1",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }},
+                {{
+                    "action_type": "write",
+                    "element_type": "text",
+                    "description": "Present consistent example scenario",
+                    "target": "scenario_text",
+                    "duration": 5.0,
+                    "parameters": {{"text": "Medical test scenario: Disease prevalence 1%, Sensitivity 90%, Specificity 95%", "color": "#FFFFFF", "easing": "ease_in_out"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Pause for narrator to explain prevalence and test properties",
+                    "target": "narration_pause_2",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }},
+                {{
                     "action_type": "write",
                     "element_type": "math_equation",
-                    "description": "Write the Bayes' theorem equation P(A|B) = P(B|A)P(A)/P(B)",
-                    "target": "bayes_equation",
-                    "duration": 4.0,
-                    "parameters": {{"equation": "P(A|B) = \\\\frac{P(B|A)P(A)}{P(B)}", "color": "#00FF00"}}
+                    "description": "Define prior and test properties with color coding",
+                    "target": "definitions",
+                    "duration": 6.0,
+                    "parameters": {{"equation": "P(D)=0.01,\\ \\text{{sensitivity}}=0.90,\\ \\text{{specificity}}=0.95", "color": "#3B82F6", "easing": "ease_in_out"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Hold before moving on",
+                    "target": "narration_pause_3",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }},
+                {{
+                    "action_type": "write",
+                    "element_type": "diagram",
+                    "description": "Draw a population box to anchor the example that persists across scenes",
+                    "target": "population_box",
+                    "duration": 6.0,
+                    "parameters": {{"style": "outlined", "color": "#3B82F6", "label": "Population"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Pause to reinforce the setup",
+                    "target": "narration_pause_4",
+                    "duration": 3.0,
+                    "parameters": {{}}
                 }}
             ],
             "scene_dependencies": []
+        }},
+        {{
+            "id": "equation_intro",
+            "title": "Bayes' Formula",
+            "description": "Introduce Bayes' theorem and map terms to the example.",
+            "sub_concept_id": "bayes_equation",
+            "actions": [
+                {{
+                    "action_type": "write",
+                    "element_type": "math_equation",
+                    "description": "Write Bayes' theorem",
+                    "target": "bayes_equation",
+                    "duration": 4.0,
+                    "parameters": {{"equation": "P(D\\mid +)=\\frac{{P(+\\mid D)P(D)}}{{P(+)}}", "color": "#22C55E", "easing": "ease_in_out"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Pause to read equation",
+                    "target": "narration_pause_5",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }},
+                {{
+                    "action_type": "write",
+                    "element_type": "text",
+                    "description": "Label terms: prior, likelihood, evidence, posterior",
+                    "target": "term_labels",
+                    "duration": 5.0,
+                    "parameters": {{"text": "prior: P(D) (blue), likelihood: P(+|D) (green), evidence: P(+) (white), posterior: P(D|+) (red)", "color": "#FFFFFF"}}
+                }},
+                {{
+                    "action_type": "highlight",
+                    "element_type": "math_equation",
+                    "description": "Color-code terms on the formula",
+                    "target": "bayes_equation",
+                    "duration": 3.0,
+                    "parameters": {{"spans": [{{"term": "P(D)", "color": "#3B82F6"}}, {{"term": "P(+\\mid D)", "color": "#22C55E"}}, {{"term": "P(+)", "color": "#FFFFFF"}}, {{"term": "P(D\\mid +)", "color": "#EF4444"}}]}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Narration pause after mapping",
+                    "target": "narration_pause_6",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }}
+            ],
+            "scene_dependencies": ["intro_context"]
+        }},
+        {{
+            "id": "tree_diagram",
+            "title": "Likelihood Paths via Tree",
+            "description": "Show a probability tree aligned with the same example numbers.",
+            "sub_concept_id": "likelihood_evidence",
+            "actions": [
+                {{
+                    "action_type": "write",
+                    "element_type": "diagram",
+                    "description": "Draw tree branches for D and ¬D from population",
+                    "target": "probability_tree",
+                    "duration": 6.0,
+                    "parameters": {{"from": "population_box", "branches": [{{"label": "D (1%)", "color": "#3B82F6"}}, {{"label": "¬D (99%)", "color": "#3B82F6"}}]}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Pause for narrator to explain branches",
+                    "target": "narration_pause_7",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }},
+                {{
+                    "action_type": "write",
+                    "element_type": "diagram",
+                    "description": "Add test outcome branches with sensitivity/specificity",
+                    "target": "probability_tree_outcomes",
+                    "duration": 6.0,
+                    "parameters": {{"branches": [{{"from": "D", "label": "+ (90%)", "color": "#22C55E"}}, {{"from": "D", "label": "− (10%)", "color": "#22C55E"}}, {{"from": "¬D", "label": "+ (5%)", "color": "#22C55E"}}, {{"from": "¬D", "label": "− (95%)", "color": "#22C55E"}}]}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Pause after outcomes",
+                    "target": "narration_pause_8",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }},
+                {{
+                    "action_type": "highlight",
+                    "element_type": "diagram",
+                    "description": "Highlight the evidence paths that lead to '+'",
+                    "target": "probability_tree_outcomes",
+                    "duration": 3.0,
+                    "parameters": {{"paths": ["D→+", "¬D→+"], "color": "#EF4444"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Hold to emphasize 'evidence' P(+)",
+                    "target": "narration_pause_9",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }}
+            ],
+            "scene_dependencies": ["intro_context", "equation_intro"]
+        }},
+        {{
+            "id": "frequency_view",
+            "title": "Frequency Grid Intuition",
+            "description": "Use a 10,000-dot grid to make P(+) and P(D|+) concrete with the same numbers.",
+            "sub_concept_id": "evidence_frequency",
+            "actions": [
+                {{
+                    "action_type": "write",
+                    "element_type": "diagram",
+                    "description": "Create 10,000-dot grid inside population box (persists across scenes)",
+                    "target": "frequency_grid",
+                    "duration": 6.0,
+                    "parameters": {{"rows": 100, "cols": 100, "color": "#555555", "parent": "population_box"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Pause for narrator to explain frequency framing",
+                    "target": "narration_pause_10",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }},
+                {{
+                    "action_type": "highlight",
+                    "element_type": "diagram",
+                    "description": "Color 100 diseased dots (1%) in blue",
+                    "target": "frequency_grid_D",
+                    "duration": 4.0,
+                    "parameters": {{"count": 100, "color": "#3B82F6"}}
+                }},
+                {{
+                    "action_type": "highlight",
+                    "element_type": "diagram",
+                    "description": "Among D, highlight 90 true positives in green",
+                    "target": "frequency_grid_TP",
+                    "duration": 4.0,
+                    "parameters": {{"count": 90, "color": "#22C55E"}}
+                }},
+                {{
+                    "action_type": "highlight",
+                    "element_type": "diagram",
+                    "description": "Among ¬D, highlight 495 false positives (5% of 9,900) in green outline",
+                    "target": "frequency_grid_FP",
+                    "duration": 5.0,
+                    "parameters": {{"count": 495, "style": "outline", "color": "#22C55E"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Hold to let counts sink in",
+                    "target": "narration_pause_11",
+                    "duration": 3.0,
+                    "parameters": {{}}
+                }}
+            ],
+            "scene_dependencies": ["intro_context", "equation_intro", "tree_diagram"]
+        }},
+        {{
+            "id": "posterior_compute",
+            "title": "Compute P(D|+)",
+            "description": "Compute the posterior step-by-step using the same counts and Bayes' formula.",
+            "sub_concept_id": "posterior_computation",
+            "actions": [
+                {{
+                    "action_type": "write",
+                    "element_type": "math_equation",
+                    "description": "Substitute numeric values into Bayes' formula",
+                    "target": "substitution",
+                    "duration": 5.0,
+                    "parameters": {{"equation": "P(D\\mid +)=\\frac{{0.90\\times 0.01}}{{0.90\\times 0.01 + 0.05\\times 0.99}}", "color": "#FFFFFF"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Pause for narrator before simplifying",
+                    "target": "narration_pause_12",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }},
+                {{
+                    "action_type": "transform",
+                    "element_type": "math_equation",
+                    "description": "Simplify numerators and denominators",
+                    "target": "substitution",
+                    "duration": 4.0,
+                    "parameters": {{"to_equation": "P(D\\mid +)=\\frac{{0.009}}{{0.009+0.0495}}", "color": "#FFFFFF", "easing": "ease_in_out"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Pause before final result",
+                    "target": "narration_pause_13",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }},
+                {{
+                    "action_type": "transform",
+                    "element_type": "math_equation",
+                    "description": "Compute final posterior and highlight",
+                    "target": "substitution",
+                    "duration": 4.0,
+                    "parameters": {{"to_equation": "P(D\\mid +)\\approx 0.1538\\ (15.38\\%)", "color": "#EF4444", "easing": "ease_in_out"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Hold on final posterior",
+                    "target": "narration_pause_14",
+                    "duration": 3.0,
+                    "parameters": {{}}
+                }}
+            ],
+            "scene_dependencies": ["equation_intro", "frequency_view"]
+        }},
+        {{
+            "id": "interpretation_pitfalls",
+            "title": "Interpretation & Common Pitfall",
+            "description": "Explain why a positive test doesn't mean near-certainty; connect to base rates.",
+            "sub_concept_id": "interpretation",
+            "actions": [
+                {{
+                    "action_type": "write",
+                    "element_type": "text",
+                    "description": "State the common mistake: confusing P(+|D) with P(D|+)",
+                    "target": "pitfall_text",
+                    "duration": 4.0,
+                    "parameters": {{"text": "Pitfall: P(+|D) \\neq P(D|+)", "color": "#EF4444"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Pause for narrator",
+                    "target": "narration_pause_15",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }},
+                {{
+                    "action_type": "highlight",
+                    "element_type": "diagram",
+                    "description": "Re-highlight 90 TP vs 495 FP on the same grid to show contrast",
+                    "target": "frequency_grid_contrast",
+                    "duration": 4.0,
+                    "parameters": {{"groups": [{{"label": "TP=90", "color": "#22C55E"}}, {{"label": "FP=495", "color": "#EF4444"}}]}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Hold to let the contrast register",
+                    "target": "narration_pause_16",
+                    "duration": 3.0,
+                    "parameters": {{}}
+                }}
+            ],
+            "scene_dependencies": ["posterior_compute"]
+        }},
+        {{
+            "id": "summary_takeaways",
+            "title": "Summary & Takeaways",
+            "description": "Summarize Bayes' theorem using the same scenario and numbers.",
+            "sub_concept_id": "summary",
+            "actions": [
+                {{
+                    "action_type": "write",
+                    "element_type": "text",
+                    "description": "List key takeaways linked to the same example",
+                    "target": "summary_points",
+                    "duration": 6.0,
+                    "parameters": {{"text": "1) Base rates matter. 2) Evidence combines with prior via likelihood. 3) Posterior here ≈ 15.38%.", "color": "#FFFFFF"}}
+                }},
+                {{
+                    "action_type": "wait",
+                    "element_type": "none",
+                    "description": "Final narration pause",
+                    "target": "narration_pause_17",
+                    "duration": 3.0,
+                    "parameters": {{}}
+                }},
+                {{
+                    "action_type": "fade_out",
+                    "element_type": "group",
+                    "description": "Fade out all elements to close",
+                    "target": "all_elements",
+                    "duration": 2.0,
+                    "parameters": {{}}
+                }}
+            ],
+            "scene_dependencies": ["interpretation_pitfalls"]
         }}
     ]
 }}
 
-Generate scene plans that will create clear, educational animations for the given concept."""
+Generate scene plans that will create clear, educational animations for the given concept, using a single consistent example across scenes, with slow pacing and explicit narration pauses after each major action."""
 
     CODE_GENERATION_PROMPT = """You are a Manim Code Generation Agent for creating **very simple, 2D educational STEM animations**.
 
-**TASK**: Generate complete, executable Manim code for a single animation scene using **Manim Community Edition v0.19**.
+**TASK**: From the single **SCENE PLAN** below (one scene at a time), generate complete, executable Manim code for **Manim Community Edition v0.19** that faithfully renders the specified actions with slow, narrator-friendly pacing.
 
-**SCENE PLAN**:
+**SCENE PLAN (SINGLE SCENE ONLY)**:
 {scene_plan}
 
-**SIMPLE 2D-ONLY MODE (STRICT)**
+**CLASS NAME**: {class_name}
+**TARGET DURATION (approx.)**: {target_duration} seconds
 
-0. **Hard Limits (Do Not Violate)**
-   - **2D only**: No 3D classes, no 3D cameras, no surfaces, no axes3D, no `ThreeDScene`.
-   - **One scene, one class**, must inherit from `Scene`.
-   - **One file** with exactly one class named **{class_name}**.
-   - **Single `construct(self)` method** only.
-   - **No updaters** of any kind (no `add_updater`, no `always_redraw`).
-   - **No ValueTracker/DecimalNumber**; keep logic static and stepwise.
-   - **No config edits, no camera/frame changes, no run_time tweaks** except via `self.wait()`.
-   - **Keep it small**: Max **35 lines** inside `construct()` (excluding comments/blank lines).
+============================================================
+SIMPLE 2D-ONLY MODE (STRICT)
+============================================================
 
-1. **Imports**
-   - Always start with:
-     `from manim import *`
-   - Optionally:
-     `import numpy as np` **only if actually used**.
-   - Do **not** import anything else.
+0) **Hard Limits (Do Not Violate)**
+   - **2D only**: No 3D classes/cameras/surfaces/axes3D; do not import/use `ThreeDScene`.
+   - **Exactly one scene class** named **{class_name}**, inheriting from `Scene`.
+   - **One file**, **one class**, **one `construct(self)`** method.
+   - **No updaters** (no `add_updater`, no `always_redraw`).
+   - **No ValueTracker / DecimalNumber**; keep logic static and stepwise.
+   - **No config edits**, no camera/frame changes, no run_time tweaks (use `self.wait()` only).
+   - Keep it small: **max 35 lines inside `construct()`** (exclude blank lines/comments).
 
-2. **Text & Equations**
-   - Regular text: `Text()`
-   - Math: `MathTex()` (LaTeX in math mode)
-   - Plain LaTeX (non-math): `Tex()`
-   - Examples:
-     - `title = Text("Gradient Descent", font_size=48)`
-     - `eq = MathTex(r"\\nabla f(x) = \\frac{{df}}{{dx}}")`
+1) **Imports**
+   - Always start with: `from manim import *`
+   - Optionally: `import numpy as np` **only if actually used**.
+   - Import nothing else.
 
-3. **Allowed Mobjects (2D only)**
-   - `Dot`, `Line`, `Arrow`, `Vector`, `Circle`, `Square`, `Rectangle`, `Triangle`
-   - `NumberPlane`, `Axes` (2D only)
-   - `Brace`, `SurroundingRectangle`
-   - `Text`, `MathTex`, `Tex`
-   - `VGroup`
-   - **Do not** use SVGMobject, Parametric curves, graphs requiring functions beyond the basics, or any 3D variants.
+2) **Element Types & Mapping**
+   - Use **`Text`** for plain text, **`MathTex`** for math, **`Tex`** for LaTeX (non-math).
+   - Allowed 2D mobjects: `Dot, Line, Arrow, Vector, Circle, Square, Rectangle, Triangle, NumberPlane, Axes, Brace, SurroundingRectangle, Text, MathTex, Tex, VGroup`.
+   - Unsupported elements in the plan (e.g., complex “diagram” types) must be **downgraded** to simple shapes + labels (e.g., boxes, lines, arrows, small groups of dots).
 
-4. **Allowed Animations (Keep It Basic)**
-   - `Write(mobj)` for text/equations
-   - `Create(mobj)` for geometric shapes/axes
-   - `FadeIn(mobj)`, `FadeOut(mobj)`
-   - `Transform(m1, m2)`, `ReplacementTransform(m1, m2)`
-   - `Indicate(mobj)`
-   - `self.play(...)` to run animations
-   - `self.wait(t)` for pacing
-   - **No** `ApplyMethod`, **use** `.animate` **only** for simple position/opacity/scale changes (e.g., `mobj.animate.shift(RIGHT)`)
+3) **Action → Code Mapping (Use Only These)**
+   - `"write"` → `self.play(Write(obj))`
+   - `"create"` → `self.play(Create(obj))`
+   - `"fade_in"` / `"fade_out"` → `FadeIn(obj)` / `FadeOut(obj)`
+   - `"transform"` → `Transform(old, new)` (both must exist/added)
+   - `"replacement_transform"` → `ReplacementTransform(old, new)`
+   - `"move"` → `obj.animate.shift(DIR * amount)`
+   - `"highlight"` → Prefer `Indicate(obj)`; or show a `SurroundingRectangle(obj)` with `FadeIn`/`FadeOut`
+   - `"wait"` → `self.wait(duration)`
+   - Any other `action_type` not listed → use nearest allowed mapping or **skip with a short comment** (still respect pacing).
 
-5. **Positioning (Simple & Explicit)**
-   - `to_edge(UP/DOWN/LEFT/RIGHT)`
-   - `shift(UP/DOWN/LEFT/RIGHT * amount)`
-   - `next_to(other, direction)`
-   - `move_to(ORIGIN)` / leave centered by default
-   - Avoid complex coordinate math; prefer simple shifts.
+4) **Using `target` as Variable Names (Continuity)**
+   - For each action, **use the plan’s `"target"` as the Python variable name** (sanitize to snake_case, alphanumerics + underscores).
+   - Reuse the same variable to transform/indicate; do **not** recreate after `FadeOut` unless the plan explicitly reintroduces it.
+   - If the SCENE PLAN references elements created in earlier scenes, **stub a minimal placeholder** (e.g., a labeled `Rectangle` or `Text`) consistent with the example, so this scene remains executable without cross-scene state.
 
-6. **Colors (Built-ins Only)**
-   - Use constants: `WHITE, BLACK, RED, GREEN, BLUE, YELLOW, ORANGE, PURPLE, PINK` - DO NOT USE CYAN EVER
-   - Example: `Text("Hello", color=BLUE)`
+5) **Parameters Handling**
+   - Map common fields directly:
+     - `{{"text": "..."}}` → Text(...) or Tex(...)
+     - `{{"equation": "..."}}` → MathTex(r"...")
+     - `{{"color": BUILTIN_COLOR}}`
+   - **Colors (Built-ins Only)**: `WHITE, BLACK, RED, GREEN, BLUE, YELLOW, ORANGE, PURPLE, PINK`. **Never use CYAN.**
+   - If plan provides hex colors (e.g., `#3B82F6`), **replace with the closest built-in** (e.g., `BLUE`, `GREEN`, `RED`, `WHITE`).
+   - Ignore unsupported params silently; keep code minimal.
 
-7. **Flow (Minimal & Clear)**
-   - Start with a short title (2–3 seconds)
-   - Introduce content step-by-step (never all at once)
-   - Add a brief `self.wait(1)` between logical steps
-   - End with `self.wait(2)` to hold the final state
-   - **Target total duration**: {target_duration} seconds (approximate; don’t over-animate)
+6) **Pacing & Narration (Derived from Plan)**
+   - After **every significant action**, insert a pause:  
+     `pause = clamp(round(action.duration * 0.5), 1, 3)` → `self.wait(pause)`
+   - If an explicit `"wait"` action appears, honor its `"duration"` directly (clamp to [1, 4] if very large).
+   - Animations should feel **slow and deliberate**; do **not** chain many animations without waits.
 
-8. **Forbidden (to reduce breakage)**
-   - **No**: TexMobject, TextMobject, ShowCreation, UpdateFromFunc, apply_function, complex updaters
-   - **No**: camera movements, zooms, rotating the frame, backgrounds changes, scene-wide transforms
-   - **No**: randomness, seeds, external assets (SVGS, images, sounds), 3D of any kind
-   - **No**: long code, clever hacks, or experimental APIs
+7) **Layout & Anti-overlap Heuristics**
+   - Keep a simple, readable layout:
+     - Optional title near top: `to_edge(UP)`
+     - Main content centered; secondary labels `next_to(...)`
+   - Prefer `next_to`, `to_edge`, small `shift` values; avoid dense stacking.
+   - If multiple texts/equations appear, place them **vertically** with `next_to(prev, DOWN)`.
+   - Keep font sizes moderate (e.g., `Text(..., font_size=36–48)`) to avoid overflow.
 
-9. **Style & Robustness**
-   - Clear variable names: `title`, `equation`, `plane`, `arrow_x`
-   - Keep geometry simple (few objects, few transformations)
-   - Prefer `Create`/`Write` + simple `.animate.shift(...)`
-   - Ensure every created mobject is added via an animation or `self.add(...)` before transforming it
-   - Do **not** transform or reference mobjects after they’ve been `FadeOut` unless re-created
-   
-**REMINDERS**
-- Only 2D classes & objects used; inherits from `Scene`
-- Single class named `{class_name}`; one `construct` method
-- Only allowed imports; optional numpy only if used
-- Only `Text`, `Tex`, `MathTex`, basic 2D shapes, `NumberPlane`/`Axes`
-- Only `Write`, `Create`, `FadeIn/Out`, `Transform`, `ReplacementTransform`, `Indicate`, and simple `.animate`
-- No updaters/ValueTracker/camera edits/external assets/3D/experimental APIs
-- Stepwise reveal with short waits; ends with `self.wait(3)`
-- Please make slow animation for the narrator to have enough time to explain the concept, do not make animation and scene switching too fast
-- Wait a bit between each step of the animation
-- Make sure that all the elements are place correctly, not overlapping or being overflown on the screen
-- Code is clean, minimal, and executable in Manim CE v0.19
-- For text/animated text please be careful with the position where we put it, avoid having the text overlapping with other elements on the screen
-- DO NOT INCLUDE BACKTICKS (```) IN YOUR CODE, EVER!
+8) **Flow (Minimal & Clear)**
+   - Brief title (2–3s), then step-by-step reveal matching the order of `actions`.
+   - Insert `self.wait(2)` **at minimum** between logical steps if the plan’s duration is missing.
+   - End with `self.wait(2–3)` holding the final state.
 
-**OUTPUT FORMAT (MANDATORY)**
+9) **Graceful Downgrades for Heavy Visuals**
+   - Large “grids” or thousands of dots: substitute a labeled `Rectangle` or a **small** `VGroup` (≤ 20 dots) plus a label like `"10,000 cases (schematic)"`.
+   - Complex “tree diagrams”: approximate with `Line` + `Text` labels; keep branches ≤ 4 elements.
+
+10) **Robustness**
+   - Ensure each mobject is **created/added** before transforming/indicating it.
+   - Do not reference objects after `FadeOut` unless re-created.
+   - Only allowed animations/mobjects; **no** camera moves, seeds, randomness, external assets, or experimental APIs.
+
+11) **Consistency with the Planner’s Example**
+   - **Do not change** numeric values or scenario details present in this scene plan (this preserves cross-scene example consistency).
+   - Keep variable names identical to `"target"` (post-sanitization) across all actions in this scene.
+
+12) **DO NOT INCLUDE BACKTICKS (``) IN YOUR CODE, EVER!**
+
+============================================================
+OUTPUT FORMAT (MANDATORY)
+============================================================
 <manim>
 from manim import *
 # Manim Community v0.19 — Simple 2D Scene
 
 class {class_name}(Scene):
     def construct(self):
-        # Title
-        title = Text("Your Title", font_size=48)
-        self.play(Write(title))
-        self.wait(1)
+        # Optional title (avoid overlap by placing at top)
+        # title = Text("Your Title", font_size=48).to_edge(UP)
+        # self.play(Write(title)); self.wait(2)
 
-        # Your simple 2D animation code here (use only allowed mobjects/animations)
-        # Example scaffold:
-        # eq = MathTex(r"y = mx + b").next_to(title, DOWN)
-        # self.play(Write(eq)); self.wait(1)
-        # plane = NumberPlane()
-        # self.play(Create(plane)); self.wait(1)
-        # dot = Dot(ORIGIN, color=RED)
-        # self.play(FadeIn(dot)); self.wait(1)
-        # self.play(dot.animate.shift(RIGHT*2 + UP))
-        # self.wait(1)
+        # Map actions in order from the SCENE PLAN:
+        # Example mappings (replace with this scene's real actions):
+        # eq = MathTex(r"P(D\\mid +)=\\frac{{P(+\\mid D)P(D)}}{{P(+)}}", color=WHITE)
+        # self.play(Write(eq)); self.wait(2)
+        # box = Rectangle(width=5, height=3, color=BLUE)
+        # self.play(Create(box)); self.wait(1)
+        # hl = SurroundingRectangle(eq, color=RED)
+        # self.play(Create(hl)); self.wait(1); self.play(FadeOut(hl))
+        # self.play(eq.animate.shift(DOWN*1.2)); self.wait(2)
 
         self.wait(2)
 </manim>
@@ -276,8 +635,11 @@ class {class_name}(Scene):
 
         try:
             # Step 1: Generate scene plans
-            scene_plans = self._generate_scene_plans(concept_analysis)
+            scene_plans, response_json = self._generate_scene_plans(concept_analysis)
             self.logger.info(f"Generated {len(scene_plans)} scene plans")
+
+            # Save scene plans for debugging
+            self._save_scene_plans(scene_plans, concept_analysis, response_json)
 
             # Step 2: Generate Manim code for each scene
             scene_codes = self._generate_scene_codes(scene_plans)
@@ -332,7 +694,7 @@ class {class_name}(Scene):
                 token_usage=self.get_token_usage()
             )
 
-    def _generate_scene_plans(self, concept_analysis: ConceptAnalysis) -> List[ScenePlan]:
+    def _generate_scene_plans(self, concept_analysis: ConceptAnalysis) -> tuple[List[ScenePlan], Dict[str, Any]]:
         """Generate scene plans from concept analysis"""
 
         user_message = f"Analyze this STEM concept and create scene plans:\n\n{json.dumps(concept_analysis.model_dump(), indent=2)}"
@@ -355,11 +717,29 @@ class {class_name}(Scene):
                     self.logger.warning(f"Invalid scene plan data: {e}")
                     continue
 
-            return scene_plans
+            return scene_plans, response_json
 
         except Exception as e:
             self.logger.error(f"Scene planning failed: {e}")
             raise ValueError(f"Failed to generate scene plans: {e}")
+
+    def _save_scene_plans(self, scene_plans: List[ScenePlan], concept_analysis: ConceptAnalysis, response_json: Dict[str, Any]) -> Path:
+        """Save raw scene plans output to JSON file for debugging"""
+
+        # Generate filename from concept
+        safe_name = "".join(c if c.isalnum() else "_" for c in concept_analysis.main_concept.lower())
+        safe_name = safe_name[:50]  # Limit length
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{safe_name}_raw_scene_plans_{timestamp}.json"
+
+        filepath = self.output_dir / "scene_plans" / filename
+
+        # Save raw response
+        with open(filepath, 'w') as f:
+            json.dump(response_json, f, indent=2)
+
+        self.logger.info(f"Raw scene plans output saved to {filepath}")
+        return filepath
 
     def _generate_scene_codes(self, scene_plans: List[ScenePlan]) -> List[ManimSceneCode]:
         """Generate Manim code for each scene plan in parallel"""
@@ -371,24 +751,43 @@ class {class_name}(Scene):
             """Generate code for a single scene"""
             try:
                 self.logger.info(f"Generating code for scene: {scene_plan.title}")
+                self.logger.debug(f"Scene ID: {scene_plan.id}, Actions count: {len(scene_plan.actions)}")
 
                 class_name = self._sanitize_class_name(scene_plan.id)
-                user_message = f"Generate Manim code for this scene plan:\n\n{json.dumps(scene_plan.model_dump(), indent=2)}"
+                self.logger.debug(f"Sanitized class name: {class_name}")
+
+                # Log the scene plan for debugging
+                scene_plan_json = json.dumps(scene_plan.model_dump(), indent=2)
+                self.logger.debug(f"Scene plan JSON length: {len(scene_plan_json)} characters")
+                self.logger.debug(f"First action parameters: {scene_plan.actions[0].parameters if scene_plan.actions else 'N/A'}")
+
+                try:
+                    formatted_prompt = self.CODE_GENERATION_PROMPT.format(
+                        scene_plan=scene_plan_json,
+                        class_name=class_name,
+                        target_duration="25-30"
+                    )
+                    self.logger.debug(f"System prompt formatted successfully, length: {len(formatted_prompt)}")
+                except Exception as fmt_error:
+                    self.logger.error(f"Failed to format system prompt: {fmt_error}")
+                    self.logger.error(f"Format error type: {type(fmt_error).__name__}")
+                    raise
 
                 response = self._call_llm(
-                    system_prompt=self.CODE_GENERATION_PROMPT.format(
-                        scene_plan=json.dumps(scene_plan.model_dump(), indent=2),
-                        class_name=class_name,
-                        target_duration="15-30"
-                    ),
-                    user_message=user_message,
+                    system_prompt=formatted_prompt,
+                    user_message="Generate the Manim code for the scene plan specified above.",
                     temperature=self.config.temperature,
                     max_retries=3
                 )
 
+                self.logger.debug(f"LLM response received, length: {len(response)} characters")
+                self.logger.debug(f"Response preview: {response[:200]}...")
+
                 manim_code, extraction_method = self._extract_manim_code(response)
+                self.logger.debug(f"Code extraction method: {extraction_method}")
 
                 if manim_code:
+                    self.logger.debug(f"Extracted code length: {len(manim_code)} characters")
                     self._save_scene_code(scene_plan.id, class_name, manim_code, response)
 
                     scene_code = ManimSceneCode(
@@ -403,10 +802,15 @@ class {class_name}(Scene):
                     return scene_code
                 else:
                     self.logger.error(f"Failed to extract Manim code from response for scene: {scene_plan.id}")
+                    self.logger.error(f"Response contained: {response[:500]}...")
                     return None
 
             except Exception as e:
                 self.logger.error(f"Code generation failed for scene {scene_plan.id}: {e}")
+                self.logger.error(f"Exception type: {type(e).__name__}")
+                self.logger.error(f"Exception details: {str(e)}")
+                import traceback
+                self.logger.error(f"Traceback: {traceback.format_exc()}")
                 return None
 
         with ThreadPoolExecutor(max_workers=min(len(scene_plans), 10)) as executor:

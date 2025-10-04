@@ -79,8 +79,8 @@ class Settings(BaseSettings):
     script_generation_timeout: int = 180  # seconds
 
     # Audio Synthesis Settings
-    tts_voice_id: str = "JBFqnCBsd6RMkjVDRZzb"
-    tts_model_id: str = "eleven_multilingual_v2"
+    tts_voice_id: str = "Qggl4b0xRMiqOwhPtVWT"
+    tts_model_id: str = "eleven_v3"
     tts_stability: float = 0.75
     tts_similarity_boost: float = 0.75
     tts_style: float = 0.0
@@ -111,6 +111,9 @@ class Settings(BaseSettings):
     llm_temperature: float = 1.0
     llm_max_retries: int = 3
     llm_timeout: int = 120  # seconds
+
+    # Language Settings
+    target_language: str = "English"  # Supported: English, Chinese, Spanish, Vietnamese
 
     class Config:
         env_file = ".env"
