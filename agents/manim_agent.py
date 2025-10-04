@@ -580,6 +580,7 @@ SIMPLE 2D-ONLY MODE (STRICT)
    - Prefer `next_to`, `to_edge`, small `shift` values; avoid dense stacking.
    - If multiple texts/equations appear, place them **vertically** with `next_to(prev, DOWN)`.
    - Keep font sizes moderate (e.g., `Text(..., font_size=36–48)`) to avoid overflow.
+   - Keep explaination text, calculation and the visualization seperate to avoid overlapping
 
 8) **Flow (Minimal & Clear)**
    - Brief title (2–3s), then step-by-step reveal matching the order of `actions`.

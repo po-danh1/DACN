@@ -266,12 +266,15 @@ class AudioSynthesizer:
         return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
     def _generate_audio_segments(self, subtitles: List[Dict[str, Any]]) -> List[AudioSegment]:
-        """Generate audio for each subtitle using ElevenLabs"""
+        """Generate audio for each subtitle using ElevenLabs with duration validation and speed adjustment"""
 
         audio_segments = []
 
-        for subtitle in subtitles:
+        for i, subtitle in enumerate(subtitles):
             self.logger.info(f"Generating audio for subtitle {subtitle['sequence']}: {subtitle['text'][:50]}...")
+
+            # Get next subtitle for time slot calculation
+            next_subtitle = subtitles[i + 1] if i + 1 < len(subtitles) else None
 
             for attempt in range(self.max_retries):
                 try:
@@ -286,16 +289,21 @@ class AudioSynthesizer:
                     # Save audio segment to temporary file
                     segment_path = self._save_audio_segment(audio, subtitle['sequence'])
 
-                    # Get actual duration
-                    actual_duration = self._get_audio_duration(segment_path)
+                    # Validate and adjust audio duration if needed
+                    adjusted_segment_path = self._validate_and_adjust_audio_segment(
+                        segment_path, subtitle, next_subtitle
+                    )
+
+                    # Get final actual duration
+                    actual_duration = self._get_audio_duration(adjusted_segment_path)
 
                     audio_segment = AudioSegment(
                         text=subtitle['text'],
                         start_time=subtitle['start_time'],
                         end_time=subtitle['end_time'],
-                        audio_path=str(segment_path),
+                        audio_path=str(adjusted_segment_path),
                         duration=actual_duration,
-                        file_size=segment_path.stat().st_size / (1024 * 1024)
+                        file_size=adjusted_segment_path.stat().st_size / (1024 * 1024)
                     )
 
                     audio_segments.append(audio_segment)
@@ -351,21 +359,46 @@ class AudioSynthesizer:
 
         for i, segment in enumerate(audio_segments):
             if not segment.audio_path:
+                self.logger.warning(f"Skipping segment {i+1} - no audio path")
                 continue
 
             gap = segment.start_time - current_time
 
+            # Add silence gap if needed
             if gap > 0.05:
                 silence_duration_ms = int(gap * 1000)
                 combined += PydubAudioSegment.silent(duration=silence_duration_ms)
-                self.logger.debug(f"Added {gap:.2f}s silence before segment {i+1}")
+                self.logger.debug(f"Added {gap:.2f}s silence before segment {i+1} (seq: {segment.text[:20]}...)")
 
-            audio_clip = PydubAudioSegment.from_mp3(segment.audio_path)
-            combined += audio_clip
-            current_time = segment.start_time + (segment.duration or 0)
+            # Load and add the audio segment
+            try:
+                audio_clip = PydubAudioSegment.from_mp3(segment.audio_path)
+                combined += audio_clip
 
-        combined.export(output_path, format="mp3", bitrate="192k")
+                # Log timing info for debugging
+                actual_duration = len(audio_clip) / 1000.0
+                self.logger.debug(f"Added segment {i+1} (seq: {segment.sequence}): {actual_duration:.2f}s at {segment.start_time:.2f}s")
+
+                current_time = segment.start_time + actual_duration
+
+                # Check for potential overlap with next segment
+                if i + 1 < len(audio_segments):
+                    next_segment = audio_segments[i + 1]
+                    if current_time > next_segment.start_time:
+                        self.logger.warning(f"Segment {i+1} (seq: {segment.sequence}) extends into next segment by {current_time - next_segment.start_time:.2f}s")
+
+            except Exception as e:
+                self.logger.error(f"Failed to load audio segment {i+1}: {e}")
+                continue
+
+        # Calculate final duration and log summary
+        final_duration = len(combined) / 1000.0
         self.logger.info(f"Successfully concatenated audio with timing: {output_filename}")
+        self.logger.info(f"Final audio duration: {final_duration:.2f}s")
+
+        # Export the combined audio
+        combined.export(output_path, format="mp3", bitrate="192k")
+
         return output_path
 
 
@@ -396,6 +429,79 @@ class AudioSynthesizer:
         except Exception as e:
             self.logger.warning(f"Could not get audio duration for {audio_path}: {e}")
             return None
+
+    def _speed_up_audio(self, audio_path: Path, speed_factor: float) -> Path:
+        """Speed up audio by a given factor while preserving pitch"""
+
+        try:
+            audio = PydubAudioSegment.from_mp3(audio_path)
+
+            # Calculate new sample rate for faster playback
+            new_sample_rate = int(audio.frame_rate * speed_factor)
+
+            # Change the frame rate to speed up audio (this also raises pitch)
+            sped_up_audio = audio._spawn(audio.raw_data, overrides={'frame_rate': new_sample_rate})
+
+            # Export with original frame rate to restore pitch
+            sped_up_audio = sped_up_audio.set_frame_rate(audio.frame_rate)
+
+            # Save sped up audio with new filename
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            sped_up_filename = f"{audio_path.stem}_spedup_{int(speed_factor*100)}_{timestamp}.mp3"
+            sped_up_path = audio_path.parent / sped_up_filename
+
+            sped_up_audio.export(sped_up_path, format="mp3", bitrate="192k")
+
+            self.logger.info(f"Audio sped up by {speed_factor*100:.0f}%: {sped_up_filename}")
+            return sped_up_path
+
+        except Exception as e:
+            self.logger.error(f"Failed to speed up audio {audio_path}: {e}")
+            return audio_path  # Return original if speedup fails
+
+    def _validate_and_adjust_audio_segment(self, segment_path: Path, current_segment: Dict[str, Any], next_segment: Optional[Dict[str, Any]] = None) -> Path:
+        """Validate audio segment duration and adjust if it exceeds allocated time"""
+
+        actual_duration = self._get_audio_duration(segment_path)
+        if actual_duration is None:
+            return segment_path
+
+        # Calculate allocated time slot
+        allocated_time = current_segment['duration']
+
+        # If next segment exists, calculate available time between segments
+        if next_segment:
+            allocated_time = next_segment['start_time'] - current_segment['start_time']
+
+        self.logger.debug(f"Segment {current_segment['sequence']}: actual={actual_duration:.2f}s, allocated={allocated_time:.2f}s")
+
+        # If audio exceeds allocated time, try speed adjustments
+        if actual_duration > allocated_time:
+            self.logger.warning(f"Audio segment {current_segment['sequence']} exceeds time slot: {actual_duration:.2f}s > {allocated_time:.2f}s")
+
+            speed_factors = [1.1, 1.25, 1.5]  # 10%, 25%, 50% speed increases
+            current_segment_path = segment_path
+
+            for speed_factor in speed_factors:
+                new_duration = actual_duration / speed_factor
+                if new_duration <= allocated_time:
+                    current_segment_path = self._speed_up_audio(segment_path, speed_factor)
+                    final_duration = self._get_audio_duration(current_segment_path)
+                    self.logger.info(f"Segment {current_segment['sequence']} sped up by {speed_factor*100:.0f}%: {final_duration:.2f}s <= {allocated_time:.2f}s")
+                    break
+                else:
+                    self.logger.debug(f"Speed {speed_factor*100:.0f}% still too long: {new_duration:.2f}s > {allocated_time:.2f}s")
+
+            # Clean up intermediate files
+            if current_segment_path != segment_path:
+                try:
+                    segment_path.unlink()
+                except Exception as e:
+                    self.logger.warning(f"Failed to clean up intermediate file {segment_path}: {e}")
+
+            return current_segment_path
+
+        return segment_path
 
     def cleanup_temp_files(self):
         """Clean up temporary audio segment files"""

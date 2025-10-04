@@ -179,7 +179,7 @@ EXAMPLE (Easy & Clear) for “Area of a Circle”:
             response_json = self._call_llm_structured(
                 system_prompt=self.SYSTEM_PROMPT,
                 user_message=user_message,
-                temperature=0.7,  # Lower temperature for more consistent structure
+                temperature=0.5,
                 max_retries=3,
             )
 

@@ -73,6 +73,8 @@ You are an Educational Script Generator for STEM animations.
 
 **TARGET LANGUAGE**: {target_language}
 
+**VIDEO DURATION**: {video_duration_minutes:.1f}:{video_duration_seconds:05.2f} (minutes:seconds)
+
 ---
 
 ## PRIMARY OBJECTIVE
@@ -195,7 +197,7 @@ Dividing rise by run gives the same value anywhere on the line.
             self.logger.info(f"Video duration: {video_duration:.2f} seconds")
 
             # Generate script using Gemini
-            srt_content = self._generate_script_with_gemini(video_file, target_language)
+            srt_content = self._generate_script_with_gemini(video_file, target_language, video_duration)
 
             if srt_content:
                 # Parse and validate SRT content
@@ -232,8 +234,8 @@ Dividing rise by run gives the same value anywhere on the line.
                 model_used=self.model
             )
 
-    def _generate_script_with_gemini(self, video_file: Path, target_language: str = "English") -> Optional[str]:
-        """Generate script using Gemini 2.5 Flash"""
+    def _generate_script_with_gemini(self, video_file: Path, target_language: str = "English", video_duration: float = 0.0) -> Optional[str]:
+        """Generate script using Gemini"""
 
         for attempt in range(self.max_retries):
             try:
@@ -258,11 +260,18 @@ Dividing rise by run gives the same value anywhere on the line.
 
                 # Generate script with Gemini
                 self.logger.info(f"Generating script with {self.model} in {target_language}")
-                prompt = self.SCRIPT_GENERATION_PROMPT.format(target_language=target_language)
+                video_duration_minutes = int(video_duration // 60)
+                video_duration_seconds = video_duration % 60
+                prompt = self.SCRIPT_GENERATION_PROMPT.format(
+                    target_language=target_language,
+                    video_duration=video_duration,
+                    video_duration_minutes=video_duration_minutes,
+                    video_duration_seconds=video_duration_seconds
+                )
                 response = self.client.models.generate_content(
                     model=self.model,
                     contents=[uploaded_file, prompt],
-                    config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=1024))
+                    config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=2048))
                 )
 
                 script_content = response.text

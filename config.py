@@ -90,7 +90,7 @@ class Settings(BaseSettings):
     animation_reasoning_tokens: Optional[int] = 4096
 
     # Animation generation settings
-    animation_temperature: float = 0.7
+    animation_temperature: float = 0.5
     animation_max_retries_per_scene: int = 3
     animation_enable_simplification: bool = True
 
@@ -129,7 +129,6 @@ class Settings(BaseSettings):
     video_composition_timeout: int = 600  # seconds
 
     # LLM Settings
-    llm_temperature: float = 1.0
     llm_max_retries: int = 3
     llm_timeout: int = 120  # seconds
 
