@@ -103,7 +103,8 @@ class Pipeline:
     def run(
         self,
         concept: str,
-        progress_callback: Optional[Callable[[str, float], None]] = None
+        progress_callback: Optional[Callable[[str, float], None]] = None,
+        target_language: str = "English"
     ) -> Dict[str, Any]:
         """
         Execute the full pipeline (Phase 4: concept interpretation + animation generation + script generation + audio synthesis + video composition)
@@ -111,13 +112,14 @@ class Pipeline:
         Args:
             concept: STEM concept to process
             progress_callback: Optional callback for progress updates (message, percentage)
+            target_language: Target language for narration (English, Chinese, Spanish, Vietnamese)
 
         Returns:
             Dictionary with status, results, and metadata
         """
         
         start_time = time.time()
-        self.logger.info(f"Starting pipeline for concept: {concept}")
+        self.logger.info(f"Starting pipeline for concept: {concept} in {target_language}")
         
         try:
             # Step 1: Concept Interpretation
@@ -146,7 +148,7 @@ class Pipeline:
                 if progress_callback:
                     progress_callback("Generating narration script...", 0.7)
 
-                script_result = self._execute_script_generation(animation_result.silent_animation_path)
+                script_result = self._execute_script_generation(animation_result.silent_animation_path, target_language)
 
                 if progress_callback:
                     if script_result.success:
@@ -317,10 +319,10 @@ class Pipeline:
         self.logger.info("Step 2: Animation Generation")
         return self.manim_agent.execute(analysis)
 
-    def _execute_script_generation(self, animation_path: str):
+    def _execute_script_generation(self, animation_path: str, target_language: str = "English"):
         """Phase 3: Generate narration script"""
-        self.logger.info("Step 3: Script Generation")
-        return self.script_generator.execute(animation_path)
+        self.logger.info(f"Step 3: Script Generation in {target_language}")
+        return self.script_generator.execute(animation_path, target_language)
 
     def _execute_audio_synthesis(self, script_path: str, target_duration: Optional[float] = None):
         """Phase 3: Synthesize audio from script"""
