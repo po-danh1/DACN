@@ -530,7 +530,6 @@ SIMPLE 2D-ONLY MODE (STRICT)
    - **No updaters** (no `add_updater`, no `always_redraw`).
    - **No ValueTracker / DecimalNumber**; keep logic static and stepwise.
    - **No config edits**, no camera/frame changes, no run_time tweaks (use `self.wait()` only).
-   - Keep it small: **max 35 lines inside `construct()`** (exclude blank lines/comments).
 
 1) **Imports**
    - Always start with: `from manim import *`
@@ -584,8 +583,8 @@ SIMPLE 2D-ONLY MODE (STRICT)
 
 8) **Flow (Minimal & Clear)**
    - Brief title (2–3s), then step-by-step reveal matching the order of `actions`.
-   - Insert `self.wait(2)` **at minimum** between logical steps if the plan’s duration is missing.
-   - End with `self.wait(2–3)` holding the final state.
+   - Insert `self.wait(1)` **at minimum** between logical steps if the plan’s duration is missing.
+   - End with `self.wait(2)` holding the final state.
 
 9) **Graceful Downgrades for Heavy Visuals**
    - Large “grids” or thousands of dots: substitute a labeled `Rectangle` or a **small** `VGroup` (≤ 20 dots) plus a label like `"10,000 cases (schematic)"`.
@@ -595,12 +594,20 @@ SIMPLE 2D-ONLY MODE (STRICT)
    - Ensure each mobject is **created/added** before transforming/indicating it.
    - Do not reference objects after `FadeOut` unless re-created.
    - Only allowed animations/mobjects; **no** camera moves, seeds, randomness, external assets, or experimental APIs.
+   - Make sure that your code match with the concept we are tring to visualize.
+   - The visualization must be correct and reflect the topic being shown since this will affect the learning outcome.
+   - Avoid using uncommon parameters and methods in your code.
 
 11) **Consistency with the Planner’s Example**
    - **Do not change** numeric values or scenario details present in this scene plan (this preserves cross-scene example consistency).
    - Keep variable names identical to `"target"` (post-sanitization) across all actions in this scene.
 
 12) **DO NOT INCLUDE BACKTICKS (``) IN YOUR CODE, EVER!**
+
+**GUIDELINE**:
+- Skim through the scence and think of a draft version.
+- Make sure to iterate through the code to make sure all the codes are correct.
+- You have to make sure that all elements are created and placed correctly on the scene.
 
 ============================================================
 OUTPUT FORMAT (MANDATORY)
