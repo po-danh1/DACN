@@ -66,105 +66,109 @@ class ScriptGenerator:
         # Setup logging
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    SCRIPT_GENERATION_PROMPT = """You are an Educational Script Generator for STEM animations.
+    SCRIPT_GENERATION_PROMPT = """
+You are an Educational Script Generator for STEM animations.
 
 **TASK**: Watch the provided silent animation video and create a synchronized narration script in SRT (SubRip) format.
 
-**VIDEO CONTEXT**: This is a mathematical/STEM educational animation explaining a concept step-by-step. The animation was generated to help students understand complex visual ideas.
-
 **TARGET LANGUAGE**: {target_language}
 
-**YOUR GUIDELINES**:
+---
 
-1. **Watch Carefully**: Analyze the entire video to understand:
-   - What concepts are being visualized
-   - The timing and flow of animations
-   - When key elements appear or transform
-   - The educational narrative being shown
+## PRIMARY OBJECTIVE
+Write a **succinct, student-friendly narration** that explains only what is **necessary for learning**. Do **not** describe every on-screen action. Focus on the key ideas, reasoning, and what to notice.
 
-2. **Create Educational Narration**:
-   - Use clear, conversational language appropriate for students
-   - Explain what's happening on screen as it happens
-   - Define technical terms simply when they first appear
-   - Connect visual elements to the underlying concepts
-   - Use a friendly, engaging tone (not robotic)
+---
 
-3. **SRT FORMAT - EXTREMELY IMPORTANT**:
-   - **TIMESTAMP FORMAT**: MUST be exactly HH:MM:SS,mmm (two digits for hours, minutes, seconds, COMMA, three digits milliseconds)
-   - **EXAMPLE CORRECT**: 00:00:03,500 (COMMA between seconds and milliseconds!)
-   - **WRONG EXAMPLES**: 00:00:03.500 (period), 00:00:03,50 (not 3 digits), 00:0:03,500 (missing leading zero)
-   - **EACH timestamp MUST have**: HH:MM:SS,mmm format with COMMA as separator
-   - **Each subtitle**: 3-6 seconds minimum for natural speech timing
-   - **Complete sentences only**: Each subtitle must be a full, grammatically correct sentence
-   - **Sequence**: Start at 1 and increment by 1 for each subtitle
+## FOCUS & BREVITY RULES (STRICT)
+- **Only narrate when it adds understanding.** If a visual is self-explanatory or decorative, **omit** it.
+- **One idea per subtitle**, **one sentence** per subtitle.
+- **Word cap:** Prefer **10–14 words**, never exceed **18 words** in any subtitle.
+- **Define a term once**, then use it consistently without re-defining.
+- **Prefer “why/what to notice”** over “what moves where.”
+- **Avoid**: listing colors/shapes, camera moves, minor transitions, or stating the obvious.
+- **Avoid filler** phrases: “as you can see,” “on the screen,” “now we,” “here we.”
 
-4. **Timing Guidelines**:
-   - Start narration 0.5-1 second before visual elements appear
-   - Allow 3-5 seconds per subtitle for comfortable speaking pace
-   - Leave 0.5-1 second between subtitles for natural pauses
-   - The timing must be perfect. Therefore, avoid making long sentences.
-   - Continue explaining while animations progress
-   - End explanations slightly before visual transitions
+**INCLUDE** only these types of statements:
+1) A concise goal or orientation for the section,
+2) A definition or relationship needed to follow the step,
+3) A key observation the student might miss,
+4) A short causal link or conclusion that advances the concept.
 
-5. **Content Quality**:
-   - Focus on explaining the "what" and "why" of visual elements
-   - Connect visual steps to the overall concept
-   - Use simple, clear language appropriate for the topic
-   - Ensure smooth narrative flow between subtitles
-   
-**MORE TIMESTAMP EXAMPLES** (MUST follow this exact format with COMMA):
-- 00:00:01,000 (1 second) - NOTE THE COMMA!
-- 00:00:15,500 (15.5 seconds) - NOTE THE COMMA!
-- 00:01:02,750 (1 minute, 2.75 seconds) - NOTE THE COMMA!
-- 00:12:34,900 (12 minutes, 34.9 seconds) - NOTE THE COMMA!
+If a line does not meet one of the four above, **cut it**.
+
+---
+
+## WORKFLOW BEFORE WRITING
+1) **Skim once** to identify the learning objective and main phases.
+2) **List key beats** where understanding could fail (definition, setup, transformation, result).
+3) **Write to those beats only**, using the brevity rules.
+4) **Prune** any line that merely narrates motion without adding meaning.
+
+---
+
+## SRT FORMAT (MANDATORY)
+- **TIMESTAMP FORMAT**: exactly `HH:MM:SS,mmm` with a **comma** before milliseconds.
+- **Each subtitle** is a complete sentence, 1 line, **3–6 seconds** long.
+- **Pause** between subtitles: **0,5–1,0 seconds**.
+- **Sequence numbers** start at 1 and increment by 1.
 
 **CRITICAL: ALWAYS USE COMMA (,) NOT PERIOD (.) BETWEEN SECONDS AND MILLISECONDS**
-- ✅ CORRECT: 00:00:03,500 (COMMA!)
-- ❌ WRONG: 00:00:03.500 (PERIOD!)
+- ✅ 00:00:03,500
+- ❌ 00:00:03.500
 
-**COMMON MISTAKES TO AVOID**:
-- ❌ 00:0:03,500 → ✅ 00:00:03,500 (missing leading zeros)
-- ❌ 00:00:03,5 → ✅ 00:00:03,500 (not 3 decimal places)
-- ❌ 0:00:03,500 → ✅ 00:00:03,500 (missing leading zero for hours)
-- ❌ 00:00:03.500 → ✅ 00:00:03,500 (PERIOD instead of COMMA!)
-- ❌ 00:00:03,500 → ✅ 00:00:03,500 (missing COMMA separator)
-- ❌ 00:00:01,800 --> 00:00:02,100 (only 0.3 seconds - too short)
-- ✅ 00:00:01,800 --> 00:00:05,200 (3.4 seconds - good for speech)
+**COMMON MISTAKES TO AVOID**
+- Missing leading zeros (✅ 00:00:03,500)
+- Not 3 digits of milliseconds (✅ 00:00:03,500)
+- Durations shorter than 3 seconds
+- Describing everything on screen
+- Multiple sentences in one subtitle
 
-**REQUIREMENTS**:
-- Output ONLY the SRT content wrapped in `<srt>` tags
-- Every subtitle MUST be a complete sentence
-- Use proper SRT timestamp format (HH:MM:SS,mmm) with COMMA separator and leading zeros
-- Minimum 3 seconds per subtitle for natural speech
-- Make sure that the timestamp is matching with what being shown (it is okay to be a bit early)
-- Make explanations educational and engaging
-- Each segment should short, avoid long and unnecessary statements.
-- 
+---
 
-**SRT FORMAT EXAMPLES**:
+## TIMING GUIDELINES
+- Begin narration **slightly early**: start 0,5–1,0 s before the first key visual.
+- Keep each subtitle **3–6 s**; end slightly **before** a visual transition.
+- Maintain a natural rhythm; avoid long, compound sentences.
+
+---
+
+## STYLE
+- **Clear, conversational, {target_language}**, present tense, active voice.
+- Prefer concrete verbs and simple syntax.
+- When numbers/symbols appear, explain **their role**, not their appearance.
+
+---
+
+## OUTPUT REQUIREMENTS
+- Output **ONLY** the SRT content wrapped in `<srt>` tags.
+- No commentary outside the `<srt>` block.
+
+---
+
+## MINI EXAMPLE (brevity-focused)
 <srt>
 1
-00:00:00,000 --> 00:00:04,500
-Let's explore how bubble sort works step by step.
+00:00:00,000 --> 00:00:04,000
+We will see how slope measures a line’s steepness.
 
 2
-00:00:05,000 --> 00:00:08,500
-We begin with an unsorted array of numbers.
+00:00:04,800 --> 00:00:09,200
+Slope equals rise over run, or vertical change divided by horizontal change.
 
 3
-00:00:09,000 --> 00:00:13,500
-The algorithm compares adjacent elements in each pass.
+00:00:09,900 --> 00:00:13,500
+Notice the rise arrow shows how far the line moves up.
 
 4
-00:00:14,000 --> 00:00:18,000
-If elements are in wrong order, we swap their positions.
+00:00:14,200 --> 00:00:18,200
+The run arrow shows how far it moves to the right.
 
 5
-00:00:18,500 --> 00:00:23,000
-This process continues until the array is fully sorted.
+00:00:18,900 --> 00:00:23,000
+Dividing rise by run gives the same value anywhere on the line.
 </srt>
-
-Now analyze the video and generate the narration script following these exact requirements."""
+"""
 
     def execute(self, video_path: str, target_language: str = "English") -> ScriptResult:
         """

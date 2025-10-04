@@ -1,6 +1,6 @@
 import os
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, validator
 from pathlib import Path
 from typing import Optional, Any
 
@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     # API Keys
     openrouter_api_key: str
     google_api_key: str
-    elevenlabs_api_key: str
-    openai_api_key: str
+    elevenlabs_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
 
     # OpenRouter Configuration
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
@@ -135,6 +135,19 @@ class Settings(BaseSettings):
 
     # Language Settings
     target_language: str = "English"  # Supported: English, Chinese, Spanish, Vietnamese
+
+    @validator('elevenlabs_api_key', 'openai_api_key', pre=True)
+    def validate_tts_keys(cls, v, values):
+        # Check if this is the last key being validated
+        if 'elevenlabs_api_key' in values and 'openai_api_key' in values:
+            elevenlabs_key = values['elevenlabs_api_key']
+            openai_key = values['openai_api_key']
+
+            # If both are None or empty, raise an error
+            if (not elevenlabs_key or elevenlabs_key.strip() == '') and (not openai_key or openai_key.strip() == ''):
+                raise ValueError('At least one TTS API key (elevenlabs_api_key or openai_api_key) must be provided')
+
+        return v
 
     class Config:
         env_file = ".env"
