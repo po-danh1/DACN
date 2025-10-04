@@ -11,7 +11,8 @@ from agents.concept_interpreter import ConceptInterpreterAgent, ConceptAnalysis
 from agents.manim_agent import ManimAgent
 from agents.manim_models import AnimationConfig
 from generation.script_generator import ScriptGenerator
-from generation.audio_synthesizer import AudioSynthesizer
+from generation.tts.elevenlabs_provider import ElevenLabsTTSSynthesizer
+from generation.tts.openai_provider import OpenAITTSSynthesizer
 from generation.video_compositor import VideoCompositor
 
 class Pipeline:
@@ -65,18 +66,7 @@ class Pipeline:
         )
 
         # Initialize Audio Synthesizer (Phase 3)
-        self.audio_synthesizer = AudioSynthesizer(
-            api_key=settings.elevenlabs_api_key,
-            output_dir=settings.audio_dir,
-            voice_id=settings.tts_voice_id,
-            model_id=settings.tts_model_id,
-            stability=settings.tts_stability,
-            similarity_boost=settings.tts_similarity_boost,
-            style=settings.tts_style,
-            use_speaker_boost=settings.tts_use_speaker_boost,
-            max_retries=settings.tts_max_retries,
-            timeout=settings.tts_timeout
-        )
+        self.audio_synthesizer = self._create_tts_synthesizer(settings)
 
         # Initialize Video Compositor (Phase 4)
         self.video_compositor = VideoCompositor(
@@ -239,7 +229,7 @@ class Pipeline:
                 "models_used": {
                     "reasoning": settings.reasoning_model,
                     "multimodal": settings.multimodal_model,
-                    "tts": settings.tts_model_id
+                    "tts": settings.elevenlabs_model_id if settings.tts_provider == "elevenlabs" else settings.openai_model
                 },
                 "animation_stats": {
                     "scenes_planned": animation_result.scene_count,
@@ -338,6 +328,43 @@ class Pipeline:
         """Phase 3: Synthesize audio from script"""
         self.logger.info("Step 4: Audio Synthesis")
         return self.audio_synthesizer.execute(script_path, target_duration)
+
+    def _create_tts_synthesizer(self, settings):
+        """Create TTS synthesizer based on provider configuration"""
+        
+        if settings.tts_provider == "elevenlabs":
+            return ElevenLabsTTSSynthesizer(
+                api_key=settings.elevenlabs_api_key,
+                output_dir=settings.audio_dir,
+                voice_id=settings.elevenlabs_voice_id,
+                model_id=settings.elevenlabs_model_id,
+                stability=settings.elevenlabs_stability,
+                similarity_boost=settings.elevenlabs_similarity_boost,
+                style=settings.elevenlabs_style,
+                use_speaker_boost=settings.elevenlabs_use_speaker_boost,
+                max_retries=settings.tts_max_retries,
+                timeout=settings.tts_timeout
+            )
+        
+        elif settings.tts_provider == "openai":
+            # Get OpenAI endpoint (empty string means use default)
+            openai_endpoint = settings.openai_endpoint
+            base_url = openai_endpoint if openai_endpoint else None
+            
+            return OpenAITTSSynthesizer(
+                api_key=settings.openai_api_key,
+                output_dir=settings.audio_dir,
+                voice=settings.openai_voice,
+                model=settings.openai_model,
+                response_format=settings.openai_response_format,
+                speed=settings.openai_speed,
+                base_url=base_url,
+                max_retries=settings.tts_max_retries,
+                timeout=settings.tts_timeout
+            )
+        
+        else:
+            raise ValueError(f"Unsupported TTS provider: {settings.tts_provider}")
 
     def _execute_video_composition(self, animation_path: str, audio_path: str, script_path: str):
         """Phase 4: Compose final video"""
