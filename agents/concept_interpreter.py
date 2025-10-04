@@ -18,8 +18,8 @@ class ConceptAnalysis(BaseModel):
 
 
 class ConceptInterpreterAgent(BaseAgent):
-    def __init__(self, api_key: str, base_url: str, model: str, reasoning_tokens: Optional[float] = None):
-        super().__init__(api_key=api_key, base_url=base_url, model=model, reasoning_tokens=reasoning_tokens)
+    def __init__(self, api_key: str, base_url: str, model: str, reasoning_tokens: Optional[float] = None, reasoning_effort: Optional[str] = None):
+        super().__init__(api_key=api_key, base_url=base_url, model=model, reasoning_tokens=reasoning_tokens, reasoning_effort=reasoning_effort)
 
     SYSTEM_PROMPT = """
 You are the Concept Interpreter Agent in an AI-powered STEM animation generation pipeline.

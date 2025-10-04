@@ -84,10 +84,18 @@ class Settings(BaseSettings):
     manim_max_retries: int = 3
     manim_max_scene_duration: float = 30.0  # seconds
     manim_total_video_duration_target: float = 120.0  # seconds
+    
+    
+    ### NOTE: For Anthropic models (Sonnet 4/4.5, Opus 4/4.1), use only either reasoning tokens or reasoning effort, if both are used, reasoning effort will be prioritized
+    ### For OpenAI models (GPT-5, o3, o4-mini), only reasoning effort can trigger reasoning
 
-    # Reasoning setting
+    # Reasoning setting (Anthropic Style)
     interpreter_reasoning_tokens: Optional[int] = 2048
     animation_reasoning_tokens: Optional[int] = 4096
+    
+    # Reasoning setting (Anthropic Style)
+    interpreter_reasoning_effort: Optional[str] = "low"
+    animation_reasoning_effort: Optional[str] = "medium"
 
     # Animation generation settings
     animation_temperature: float = 0.5

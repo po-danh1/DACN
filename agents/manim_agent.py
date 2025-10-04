@@ -31,9 +31,10 @@ class ManimAgent(BaseAgent):
         model: str,
         output_dir: Path,
         config: Optional[AnimationConfig] = None,
-        reasoning_tokens: Optional[float] = None
+        reasoning_tokens: Optional[float] = None,
+        reasoning_effort: Optional[str] = None
     ):
-        super().__init__(api_key=api_key, base_url=base_url, model=model, reasoning_tokens=reasoning_tokens)
+        super().__init__(api_key=api_key, base_url=base_url, model=model, reasoning_tokens=reasoning_tokens, reasoning_effort=reasoning_effort)
         self.output_dir = Path(output_dir)
         self.config = config or AnimationConfig()
 

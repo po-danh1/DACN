@@ -10,11 +10,12 @@ from typing import Optional, Dict, Any
 class BaseAgent(ABC):
     """Base class for all AI agents using OpenRouter"""
 
-    def __init__(self, api_key: str, base_url: str, model: str, reasoning_tokens: Optional[float] = None):
+    def __init__(self, api_key: str, base_url: str, model: str, reasoning_tokens: Optional[float] = None, reasoning_effort: Optional[str] = None):
         self.api_key = api_key
         self.base_url = base_url.rstrip('/')
         self.model = model
         self.reasoning_tokens = reasoning_tokens
+        self.reasoning_effort = reasoning_effort
         self.logger = logging.getLogger(self.__class__.__name__)
         self.total_tokens = 0
         self.prompt_tokens = 0
@@ -49,7 +50,10 @@ class BaseAgent(ABC):
                 }
 
                 if self.reasoning_tokens is not None:
-                    payload["reasoning"] = {"max_tokens": int(self.reasoning_tokens)}
+                    payload["reasoning"] = {"max_tokens": int(self.reasoning_tokens), "enabled": True}
+                    
+                if self.reasoning_effort is not None:
+                    payload["reasoning"] = {"effort": self.reasoning_effort, "enabled": True}
 
                 if json_mode:
                     payload["response_format"] = {"type": "json_object"}
