@@ -96,13 +96,13 @@ class ScriptGenerator:
    - **EACH timestamp MUST have**: HH:MM:SS,mmm format with COMMA as separator
    - **Each subtitle**: 3-6 seconds minimum for natural speech timing
    - **Complete sentences only**: Each subtitle must be a full, grammatically correct sentence
-   - **Text per line**: Maximum 42 characters, maximum 2 lines per subtitle
    - **Sequence**: Start at 1 and increment by 1 for each subtitle
 
 4. **Timing Guidelines**:
    - Start narration 0.5-1 second before visual elements appear
-   - Allow 3-6 seconds per subtitle for comfortable speaking pace
+   - Allow 3-5 seconds per subtitle for comfortable speaking pace
    - Leave 0.5-1 second between subtitles for natural pauses
+   - The timing must be perfect. Therefore, avoid making long sentences.
    - Continue explaining while animations progress
    - End explanations slightly before visual transitions
 
@@ -136,10 +136,10 @@ class ScriptGenerator:
 - Every subtitle MUST be a complete sentence
 - Use proper SRT timestamp format (HH:MM:SS,mmm) with COMMA separator and leading zeros
 - Minimum 3 seconds per subtitle for natural speech
-- Make sure that the timestamp and the generated narative MUST MATCH the visual element being shown, not too early, not too late.
+- Make sure that the timestamp is matching with what being shown (it is okay to be a bit early)
 - Make explanations educational and engaging
 - Each segment should short, avoid long and unnecessary statements.
-- Segments timeline should not be too close together, give them 1 to 2 seconds before starting a new one 
+- 
 
 **SRT FORMAT EXAMPLES**:
 <srt>
