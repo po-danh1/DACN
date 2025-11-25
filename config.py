@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Model Selection (OpenRouter model IDs)
-    reasoning_model: str = "anthropic/claude-sonnet-4.5"
+    reasoning_model: str = "mistralai/mistral-nemo"
     multimodal_model: str = "gemini-2.5-pro"
 
     # TTS Provider Selection

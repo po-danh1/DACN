@@ -811,7 +811,7 @@ class {class_name}(Scene):
                     return scene_code
                 else:
                     self.logger.error(f"Failed to extract Manim code from response for scene: {scene_plan.id}")
-                    self.logger.error(f"Response contained: {response[:500]}...")
+                    self.logger.error(f"Response contained: {response[:5000]}...")
                     return None
 
             except Exception as e:
@@ -893,27 +893,82 @@ class {class_name}(Scene):
     def _clean_manim_code(self, code: str) -> str:
         """Clean Manim code by removing backticks and fixing common issues"""
 
-        # Remove all backticks - this is the main issue
+        # Bước 1: bỏ hết backticks
         code = code.replace('`', '')
 
-        # Fix common triple-backtick code block markers that might leave extra formatting
+        # Bước 2: bỏ mấy chữ 'python' ở đầu/giữa do markdown
         code = re.sub(r'python\n', '', code, flags=re.IGNORECASE)
         code = re.sub(r'\npython', '', code, flags=re.IGNORECASE)
 
-        # Remove any remaining markdown-style code formatting
+        # Bước 3: bỏ các dòng ``` còn sót
         code = re.sub(r'^```.*\n', '', code, flags=re.MULTILINE)
         code = re.sub(r'\n```.*$', '', code, flags=re.MULTILINE)
 
-        # Clean up any double newlines that might have been created
+        # Bước 4: comment hóa các dòng giải thích tiếng Anh không phải code
+        lines = code.splitlines()
+        cleaned_lines: list[str] = []
+
+        for line in lines:
+            stripped = line.lstrip()
+
+            # Nếu dòng rỗng thì giữ nguyên
+            if not stripped:
+                cleaned_lines.append(line)
+                continue
+
+            # Các prefix hợp lệ của code / comment Python
+            allowed_prefixes = (
+                "#",
+                "from ",
+                "import ",
+                "class ",
+                "def ",
+                "return",
+                "for ",
+                "if ",
+                "while ",
+                "else",
+                "elif",
+                "try",
+                "except",
+                "with ",
+                "@",
+                "self.",
+                "pass",
+                "break",
+                "continue",
+            )
+
+            is_allowed_prefix = any(stripped.startswith(p) for p in allowed_prefixes)
+
+            # Các ký tự thường thấy trong code
+            code_chars = "():[]={}+-*/.<>,"
+
+            # Heuristic: nếu dòng
+            # - không bắt đầu bằng prefix code,
+            # - bắt đầu bằng chữ cái,
+            # - có khoảng trắng (giống câu văn),
+            # - KHÔNG chứa các ký tự thường gặp trong code
+            # => coi là mô tả tự do -> chuyển thành comment
+            looks_like_english = (
+                stripped[0].isalpha()
+                and " " in stripped
+                and not any(ch in stripped for ch in code_chars)
+            )
+
+            if not is_allowed_prefix and looks_like_english:
+                indent = line[: len(line) - len(stripped)]
+                line = indent + "# " + stripped
+
+            cleaned_lines.append(line)
+
+        code = "\n".join(cleaned_lines)
+
+        # Bước 5: gom bớt newline thừa
         code = re.sub(r'\n{3,}', '\n\n', code)
 
-        # Strip leading/trailing whitespace
+        # Bước 6: strip đầu/cuối
         code = code.strip()
-
-        # Log the cleaning if significant changes were made
-        original_length = len(code.replace('`', ''))
-        if original_length != len(code):
-            self.logger.debug("Applied Manim code cleaning (removed backticks and formatting)")
 
         return code
 
