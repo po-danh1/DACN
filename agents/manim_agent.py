@@ -891,87 +891,66 @@ class {class_name}(Scene):
         return "", "failed"
 
     def _clean_manim_code(self, code: str) -> str:
-        """Clean Manim code by removing backticks and fixing common issues"""
+        """Clean Manim code by removing markdown, tags and stray explanations."""
 
-        # Bước 1: bỏ hết backticks
+        # 1. Bỏ hết backticks và code fences markdown
         code = code.replace('`', '')
+        code = re.sub(r'```.*?```', '', code, flags=re.DOTALL)
 
-        # Bước 2: bỏ mấy chữ 'python' ở đầu/giữa do markdown
-        code = re.sub(r'python\n', '', code, flags=re.IGNORECASE)
-        code = re.sub(r'\npython', '', code, flags=re.IGNORECASE)
+        # 2. Bỏ <manim> và </manim> nếu còn sót
+        code = code.replace('<manim>', '').replace('</manim>', '')
 
-        # Bước 3: bỏ các dòng ``` còn sót
-        code = re.sub(r'^```.*\n', '', code, flags=re.MULTILINE)
-        code = re.sub(r'\n```.*$', '', code, flags=re.MULTILINE)
+        # 3. Xoá mấy label ngôn ngữ kiểu "python"
+        code = re.sub(r'\bpython\b', '', code, flags=re.IGNORECASE)
 
-        # Bước 4: comment hóa các dòng giải thích tiếng Anh không phải code
+        # 4. Giảm bớt newline thừa
+        code = re.sub(r'\n{3,}', '\n\n', code)
+
+        # 5. Lọc lại theo cấu trúc Python:
+        #    - Giữ các dòng:
+        #        * rỗng
+        #        * comment (# ...)
+        #        * bắt đầu bằng: from / import / class / @
+        #        * HOẶC có thụt lề (bên trong class/def)
+        #    - Bỏ các dòng giải thích kiểu "This code creates ..."
         lines = code.splitlines()
-        cleaned_lines: list[str] = []
+        cleaned_lines = []
 
         for line in lines:
             stripped = line.lstrip()
 
-            # Nếu dòng rỗng thì giữ nguyên
-            if not stripped:
+            # dòng trống
+            if stripped == '':
+                cleaned_lines.append('')
+                continue
+
+            # comment
+            if stripped.startswith('#'):
                 cleaned_lines.append(line)
                 continue
 
-            # Các prefix hợp lệ của code / comment Python
-            allowed_prefixes = (
-                "#",
-                "from ",
-                "import ",
-                "class ",
-                "def ",
-                "return",
-                "for ",
-                "if ",
-                "while ",
-                "else",
-                "elif",
-                "try",
-                "except",
-                "with ",
-                "@",
-                "self.",
-                "pass",
-                "break",
-                "continue",
-            )
+            # import, class, decorator
+            if stripped.startswith(('from ', 'import ', 'class ', '@')):
+                cleaned_lines.append(line)
+                continue
 
-            is_allowed_prefix = any(stripped.startswith(p) for p in allowed_prefixes)
+            # các dòng thụt lề (bên trong class/def) => code hợp lệ
+            if line.startswith((' ', '\t')):
+                cleaned_lines.append(line)
+                continue
 
-            # Các ký tự thường thấy trong code
-            code_chars = "():[]={}+-*/.<>,"
+            # Còn lại là mấy câu văn xuôi / label / tag → bỏ
+            continue
 
-            # Heuristic: nếu dòng
-            # - không bắt đầu bằng prefix code,
-            # - bắt đầu bằng chữ cái,
-            # - có khoảng trắng (giống câu văn),
-            # - KHÔNG chứa các ký tự thường gặp trong code
-            # => coi là mô tả tự do -> chuyển thành comment
-            looks_like_english = (
-                stripped[0].isalpha()
-                and " " in stripped
-                and not any(ch in stripped for ch in code_chars)
-            )
+        code = '\n'.join(cleaned_lines).strip()
 
-            if not is_allowed_prefix and looks_like_english:
-                indent = line[: len(line) - len(stripped)]
-                line = indent + "# " + stripped
-
-            cleaned_lines.append(line)
-
-        code = "\n".join(cleaned_lines)
-
-        # Bước 5: gom bớt newline thừa
-        code = re.sub(r'\n{3,}', '\n\n', code)
-
-        # Bước 6: strip đầu/cuối
-        code = code.strip()
+        # 6. Đảm bảo có import manim (phòng trường hợp bị mất)
+        if 'from manim import *' not in code:
+            code = 'from manim import *\n\n' + code
 
         return code
 
+    
     def _sanitize_class_name(self, scene_id: str) -> str:
         """Convert scene ID to valid Python class name"""
         # Remove invalid characters and convert to PascalCase
