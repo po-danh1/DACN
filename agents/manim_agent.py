@@ -541,6 +541,7 @@ SIMPLE 2D-ONLY MODE (STRICT)
    - Use **`Text`** for plain text, **`MathTex`** for math, **`Tex`** for LaTeX (non-math).
    - Allowed 2D mobjects: `Dot, Line, Arrow, Vector, Circle, Square, Rectangle, Triangle, NumberPlane, Axes, Brace, SurroundingRectangle, Text, MathTex, Tex, VGroup`.
    - Unsupported elements in the plan (e.g., complex “diagram” types) must be **downgraded** to simple shapes + labels (e.g., boxes, lines, arrows, small groups of dots).
+   - For multi-line textual content (e.g., several CLOs, bullet lists, key points), you **must** group the lines using `VGroup` and arrange them vertically (see Layout & Text Safety).
 
 3) **Action → Code Mapping (Use Only These)**
    - `"write"` → `self.play(Write(obj))`
@@ -573,14 +574,48 @@ SIMPLE 2D-ONLY MODE (STRICT)
    - If an explicit `"wait"` action appears, honor its `"duration"` directly (clamp to [1, 4] if very large).
    - Animations should feel **slow and deliberate**; do **not** chain many animations without waits.
 
-7) **Layout & Anti-overlap Heuristics**
+7) **Layout & Text Safety (Anti-overlap)**
    - Keep a simple, readable layout:
      - Optional title near top: `to_edge(UP)`
-     - Main content centered; secondary labels `next_to(...)`
-   - Prefer `next_to`, `to_edge`, small `shift` values; avoid dense stacking.
-   - If multiple texts/equations appear, place them **vertically** with `next_to(prev, DOWN)`.
-   - Keep font sizes moderate (e.g., `Text(..., font_size=36–48)`) to avoid overflow.
-   - Keep explaination text, calculation and the visualization seperate to avoid overlapping
+     - Main content centered or left-aligned; secondary labels `next_to(...)` small distances.
+   - **Do NOT stack long `Text` objects directly with `next_to(prev, DOWN)`** if they contain full sentences or paragraphs.
+   - For multiple related lines of text (e.g., CLO1, CLO2, CLO3, bullet lists, summaries), you **must**:
+     - Put all lines into a Python list.
+     - Build a `VGroup` of `Text` objects from that list.
+     - Arrange them vertically with spacing.
+     - Ensure they fit within the frame without overflowing.
+
+   - Inside `construct(self)`, when you need multiple lines of text, define a small helper like:
+
+     def safe_text_block(lines, font_size=32, line_buff=0.35):
+         group = VGroup()
+         for line in lines:
+             t = Text(line, font_size=font_size, color=WHITE)
+             # Prevent horizontal overflow
+             t.scale_to_fit_width(config.frame_width - 1.5)
+             group.add(t)
+
+         # Arrange vertically with spacing
+         group.arrange(DOWN, aligned_edge=LEFT, buff=line_buff)
+
+         # Prevent vertical overflow
+         max_h = config.frame_height - 2
+         if group.height > max_h:
+             group.scale_to_fit_height(max_h)
+
+         # Position nicely in the frame (left and upper area)
+         group.to_edge(LEFT, buff=1)
+         group.to_edge(UP, buff=1.5)
+
+         return group
+
+   - When you have several related textual lines:
+     - Create a Python list: `lines = ["...", "...", "..."]`
+     - Call `safe_text_block(lines)` to get a `VGroup`.
+     - Animate it with `self.play(Write(group))` or reveal each element in `group` one by one.
+   - **Never** let long text run freely without scaling: for any long Vietnamese/English sentence, ensure `scale_to_fit_width` is used (either directly or via `safe_text_block`).
+   - Keep font sizes moderate (e.g., `Text(..., font_size=32–48)`) to avoid overflow.
+   - Keep explanatory text, calculations, and visual diagrams separated in space to avoid overlap (for example, place formulas slightly below or to the side of text blocks).
 
 8) **Flow (Minimal & Clear)**
    - Brief title (2–3s), then step-by-step reveal matching the order of `actions`.
@@ -636,6 +671,7 @@ class {class_name}(Scene):
         self.wait(2)
 </manim>
 """
+
 
     def execute(self, concept_analysis: ConceptAnalysis) -> AnimationResult:
 
