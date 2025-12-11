@@ -17,7 +17,8 @@ class Settings(BaseSettings):
 
     # Model Selection (OpenRouter model IDs)
     reasoning_model: str = "mistralai/mistral-nemo"
-    multimodal_model: str = "gemini-2.5-pro"
+    multimodal_model: str = "gemini-2.5-flash-lite"
+
 
     # TTS Provider Selection
     tts_provider: str = "elevenlabs"  # "elevenlabs", "openai"

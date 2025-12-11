@@ -614,7 +614,7 @@ SIMPLE 2D-ONLY MODE (STRICT)
      - Call `safe_text_block(lines)` to get a `VGroup`.
      - Animate it with `self.play(Write(group))` or reveal each element in `group` one by one.
    - **Never** let long text run freely without scaling: for any long Vietnamese/English sentence, ensure `scale_to_fit_width` is used (either directly or via `safe_text_block`).
-   - Keep font sizes moderate (e.g., `Text(..., font_size=32–48)`) to avoid overflow.
+   - Keep font sizes moderate (e.g., `Text(..., font_size=26–48)`) to avoid overflow.
    - Keep explanatory text, calculations, and visual diagrams separated in space to avoid overlap (for example, place formulas slightly below or to the side of text blocks).
 
 8) **Flow (Minimal & Clear)**
@@ -650,24 +650,31 @@ OUTPUT FORMAT (MANDATORY)
 ============================================================
 <manim>
 from manim import *
-# Manim Community v0.19 — Simple 2D Scene
+
+# Helper ALWAYS required in EVERY scene
+def safe_text_block(lines, font_size=28, line_buff=0.33, color=WHITE):
+    group = VGroup()
+    for line in lines:
+        t = Text(str(line), font_size=font_size, color=color)
+        # Prevent horizontal overflow
+        t.scale_to_fit_width(config.frame_width - 1.5)
+        group.add(t)
+
+    # Arrange vertically
+    group.arrange(DOWN, aligned_edge=LEFT, buff=line_buff)
+
+    # Prevent vertical overflow
+    if group.height > config.frame_height - 1.5:
+        group.scale_to_fit_height(config.frame_height - 1.5)
+
+    # Position safely on screen
+    group.to_edge(LEFT, buff=1)
+    group.to_edge(UP, buff=1)
+
+    return group
 
 class {class_name}(Scene):
     def construct(self):
-        # Optional title (avoid overlap by placing at top)
-        # title = Text("Your Title", font_size=48).to_edge(UP)
-        # self.play(Write(title)); self.wait(2)
-
-        # Map actions in order from the SCENE PLAN:
-        # Example mappings (replace with this scene's real actions):
-        # eq = MathTex(r"P(D\\mid +)=\\frac{{P(+\\mid D)P(D)}}{{P(+)}}", color=WHITE)
-        # self.play(Write(eq)); self.wait(2)
-        # box = Rectangle(width=5, height=3, color=BLUE)
-        # self.play(Create(box)); self.wait(1)
-        # hl = SurroundingRectangle(eq, color=RED)
-        # self.play(Create(hl)); self.wait(1); self.play(FadeOut(hl))
-        # self.play(eq.animate.shift(DOWN*1.2)); self.wait(2)
-
         self.wait(2)
 </manim>
 """
@@ -742,7 +749,7 @@ class {class_name}(Scene):
     def _generate_scene_plans(self, concept_analysis: ConceptAnalysis) -> tuple[List[ScenePlan], Dict[str, Any]]:
         """Generate scene plans from concept analysis"""
 
-        user_message = f"Analyze this STEM concept and create scene plans:\n\n{json.dumps(concept_analysis.model_dump(), indent=2)}"
+        user_message = ("Analyze this STEM concept and create scene plans:\n\n" + json.dumps(concept_analysis.model_dump(), indent=2, ensure_ascii=False))
 
         try:
             response_json = self._call_llm_structured(
@@ -802,7 +809,8 @@ class {class_name}(Scene):
                 self.logger.debug(f"Sanitized class name: {class_name}")
 
                 # Log the scene plan for debugging
-                scene_plan_json = json.dumps(scene_plan.model_dump(), indent=2)
+                scene_plan_json = json.dumps(scene_plan.model_dump(), indent=2, ensure_ascii=False)
+
                 self.logger.debug(f"Scene plan JSON length: {len(scene_plan_json)} characters")
                 self.logger.debug(f"First action parameters: {scene_plan.actions[0].parameters if scene_plan.actions else 'N/A'}")
 
@@ -929,64 +937,80 @@ class {class_name}(Scene):
     def _clean_manim_code(self, code: str) -> str:
         """Clean Manim code by removing markdown, tags and stray explanations."""
 
-        # 1. Bỏ hết backticks và code fences markdown
+        # 1. Remove backticks & markdown fences
         code = code.replace('`', '')
         code = re.sub(r'```.*?```', '', code, flags=re.DOTALL)
 
-        # 2. Bỏ <manim> và </manim> nếu còn sót
+        # 2. Remove <manim> tags
         code = code.replace('<manim>', '').replace('</manim>', '')
 
-        # 3. Xoá mấy label ngôn ngữ kiểu "python"
+        # 3. Remove language labels
         code = re.sub(r'\bpython\b', '', code, flags=re.IGNORECASE)
 
-        # 4. Giảm bớt newline thừa
+        # 4. Reduce excessive blank lines
         code = re.sub(r'\n{3,}', '\n\n', code)
 
-        # 5. Lọc lại theo cấu trúc Python:
-        #    - Giữ các dòng:
-        #        * rỗng
-        #        * comment (# ...)
-        #        * bắt đầu bằng: from / import / class / @
-        #        * HOẶC có thụt lề (bên trong class/def)
-        #    - Bỏ các dòng giải thích kiểu "This code creates ..."
-        lines = code.splitlines()
+        # 5. Filter valid Python code lines
         cleaned_lines = []
-
-        for line in lines:
+        for line in code.splitlines():
             stripped = line.lstrip()
 
-            # dòng trống
-            if stripped == '':
-                cleaned_lines.append('')
+            if stripped == "":
+                cleaned_lines.append("")
                 continue
-
-            # comment
-            if stripped.startswith('#'):
+            if stripped.startswith("#"):
+                cleaned_lines.append(line)
+                continue
+            if stripped.startswith(("from ", "import ", "class ", "@")):
+                cleaned_lines.append(line)
+                continue
+            if line.startswith((" ", "\t")):
                 cleaned_lines.append(line)
                 continue
 
-            # import, class, decorator
-            if stripped.startswith(('from ', 'import ', 'class ', '@')):
-                cleaned_lines.append(line)
-                continue
-
-            # các dòng thụt lề (bên trong class/def) => code hợp lệ
-            if line.startswith((' ', '\t')):
-                cleaned_lines.append(line)
-                continue
-
-            # Còn lại là mấy câu văn xuôi / label / tag → bỏ
+            # Skip narration/plain text
             continue
 
-        code = '\n'.join(cleaned_lines).strip()
+        code = "\n".join(cleaned_lines).strip()
 
-        # 6. Đảm bảo có import manim (phòng trường hợp bị mất)
-        if 'from manim import *' not in code:
-            code = 'from manim import *\n\n' + code
+        # 6. Add import if missing
+        if "from manim import *" not in code:
+            code = "from manim import *\n" + code
+
+        # 7. Insert safe_text_block if missing
+        if "def safe_text_block" not in code:
+            safe_block = """
+# Safe text block to prevent overflow & overlapping
+def safe_text_block(lines, font_size=28, line_buff=0.3, color=WHITE, max_width=None, max_height=None):
+    group = VGroup()
+    frame_w = config.frame_width
+    frame_h = config.frame_height
+
+    if max_width is None:
+        max_width = frame_w - 1.5
+    if max_height is None:
+        max_height = frame_h - 1.5
+
+    for line in lines:
+        t = Text(str(line), font_size=font_size, color=color)
+        t.scale_to_fit_width(max_width)
+        group.add(t)
+
+    group.arrange(DOWN, aligned_edge=LEFT, buff=line_buff)
+
+    if group.height > max_height:
+        group.scale_to_fit_height(max_height)
+
+    group.to_edge(LEFT, buff=1)
+    group.to_edge(UP, buff=1)
+
+    return group
+"""
+            code = code.replace("from manim import *", "from manim import *\n" + safe_block)
 
         return code
 
-    
+
     def _sanitize_class_name(self, scene_id: str) -> str:
         """Convert scene ID to valid Python class name"""
         # Remove invalid characters and convert to PascalCase
