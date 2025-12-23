@@ -935,7 +935,15 @@ class $class_name(Scene):
 
                 response = self._call_llm(
                     system_prompt=formatted_prompt,
-                    user_message="Generate the Manim code for the scene plan specified above.",
+                    user_message=(
+                        "Generate the Manim code for the scene plan above.\n"
+                        "CRITICAL REMINDERS:\n"
+                        "- ALL Python lists must be SINGLE LINE.\n"
+                        "- ALL function calls must be SINGLE LINE.\n"
+                        "- NEVER place string literals on standalone lines.\n"
+                        "- Example: lines = [\"a\", \"b\", \"c\"]\n"
+                        "- Do not break lists or function calls across lines."
+                    ),
                     temperature=self.config.temperature,
                     max_retries=3
                 )
@@ -1335,6 +1343,59 @@ def safe_text_block(
             f.write(raw_output)
 
         return filepath
+
+    def _retry_llm_for_scene(self, scene_code: ManimSceneCode, reason: str) -> bool:
+        """
+        Retry LLM code generation for a single scene when syntax is broken.
+        """
+        try:
+            self.logger.warning(f"Retrying LLM for scene {scene_code.scene_name} due to: {reason}")
+
+            scene_plan = self._scene_plans_by_id.get(scene_code.scene_id)
+            if not scene_plan:
+                self.logger.error(f"No scene plan found for {scene_code.scene_id}")
+                return False
+
+            class_name = scene_code.scene_name
+            scene_plan_json = json.dumps(scene_plan.model_dump(), indent=2, ensure_ascii=False)
+
+            template = Template(self.CODE_GENERATION_PROMPT)
+            formatted_prompt = template.safe_substitute(
+                scene_plan=scene_plan_json,
+                class_name=class_name,
+                target_duration="25-30"
+            )
+
+            response = self._call_llm(
+                system_prompt=formatted_prompt,
+                user_message=(
+                    "The previous code had a Python syntax error (likely missing commas or unclosed brackets). "
+                    "Regenerate CLEAN, SAFE Manim code.\n"
+                    "CRITICAL REMINDERS:\n"
+                    "- ALL Python lists must be SINGLE LINE.\n"
+                    "- ALL function calls must be SINGLE LINE.\n"
+                    "- NEVER place string literals on separate lines by themselves.\n"
+                    "- Example: lines = [\"a\", \"b\", \"c\"]"
+                ),
+                temperature=self.config.temperature,
+                max_retries=2
+            )
+
+            manim_code, extraction_method = self._extract_manim_code(response)
+            if not manim_code:
+                self.logger.error("Failed to extract Manim code during retry")
+                return False
+
+            scene_code.manim_code = manim_code
+            scene_code.raw_llm_output = response
+            scene_code.extraction_method = extraction_method
+
+            self.logger.info(f"Retry successful for scene {scene_code.scene_name}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Retry failed for scene {scene_code.scene_name}: {e}")
+            return False
 
     def _render_scenes(self, scene_codes: List[ManimSceneCode]) -> List[RenderResult]:
         """Render each scene using ManimRenderer"""
