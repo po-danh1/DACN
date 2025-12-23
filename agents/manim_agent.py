@@ -4,7 +4,10 @@ import re
 import json
 import tempfile
 import subprocess
+import py_compile
+import os
 from pathlib import Path
+from string import Template
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -110,6 +113,10 @@ class ManimAgent(BaseAgent):
 7. **Element Naming**:
    - Use descriptive, stable targets (e.g., "bayes_equation", "likelihood_label", "frequency_grid") reused across scenes.
    - When transforming, specify `"parameters": {"from": "<old_target>", "to": "<new_target>"}` where helpful.
+    MANDATORY TEXT FLOW RULE:
+    After every Write(...) of any text object,
+    you MUST FadeOut that object before writing another text object.
+    Never keep more than one text block visible at the same time.
 
 **OUTPUT FORMAT**:
 Return ONLY valid JSON matching this exact structure:
@@ -515,10 +522,10 @@ Generate scene plans that will create clear, educational animations for the give
 **TASK**: From the single **SCENE PLAN** below (one scene at a time), generate complete, executable Manim code for **Manim Community Edition v0.19** that faithfully renders the specified actions with slow, narrator-friendly pacing.
 
 **SCENE PLAN (SINGLE SCENE ONLY)**:
-{scene_plan}
+$scene_plan
 
-**CLASS NAME**: {class_name}
-**TARGET DURATION (approx.)**: {target_duration} seconds
+**CLASS NAME**: $class_name
+**TARGET DURATION (approx.)**: $target_duration seconds
 
 ============================================================
 SIMPLE 2D-ONLY MODE (STRICT)
@@ -526,7 +533,7 @@ SIMPLE 2D-ONLY MODE (STRICT)
 
 0) **Hard Limits (Do Not Violate)**
    - **2D only**: No 3D classes/cameras/surfaces/axes3D; do not import/use `ThreeDScene`.
-   - **Exactly one scene class** named **{class_name}**, inheriting from `Scene`.
+   - **Exactly one scene class** named **$class_name**, inheriting from `Scene`.
    - **One file**, **one class**, **one `construct(self)`** method.
    - **No updaters** (no `add_updater`, no `always_redraw`).
    - **No ValueTracker / DecimalNumber**; keep logic static and stepwise.
@@ -542,6 +549,11 @@ SIMPLE 2D-ONLY MODE (STRICT)
    - Allowed 2D mobjects: `Dot, Line, Arrow, Vector, Circle, Square, Rectangle, Triangle, NumberPlane, Axes, Brace, SurroundingRectangle, Text, MathTex, Tex, VGroup`.
    - Unsupported elements in the plan (e.g., complex “diagram” types) must be **downgraded** to simple shapes + labels (e.g., boxes, lines, arrows, small groups of dots).
    - For multi-line textual content (e.g., several CLOs, bullet lists, key points), you **must** group the lines using `VGroup` and arrange them vertically (see Layout & Text Safety).
+
+   **TEXT RENDERING ABSOLUTE RULE (CRITICAL)**
+   - NEVER use `MathTex` or LaTeX for normal text (Vietnamese or English).
+   - ONLY use `Text()` or `safe_text_block()` for titles, descriptions, objectives, CLOs, labels, and bullet points.
+   - `MathTex` is ONLY allowed for real mathematical formulas or expressions (things that truly use math notation).
 
 3) **Action → Code Mapping (Use Only These)**
    - `"write"` → `self.play(Write(obj))`
@@ -575,6 +587,22 @@ SIMPLE 2D-ONLY MODE (STRICT)
    - Animations should feel **slow and deliberate**; do **not** chain many animations without waits.
 
 7) **Layout & Text Safety (Anti-overlap)**
+    🚨 ANTI-OVERLAP RULE (MANDATORY):
+
+- At any time, ONLY ONE main text block is allowed on screen.
+- After displaying a text block using Write(...), you MUST FadeOut it
+  before writing another text block.
+
+Correct pattern:
+    text_block = safe_text_block(lines)
+    self.play(Write(text_block))
+    self.wait(...)
+    self.play(FadeOut(text_block))
+
+WRONG (causes overlapping text):
+    self.play(Write(text1))
+    self.play(Write(text2))   # ❌ text2 overlaps text1
+
    - Keep a simple, readable layout:
      - Optional title near top: `to_edge(UP)`
      - Main content centered or left-aligned; secondary labels `next_to(...)` small distances.
@@ -587,34 +615,47 @@ SIMPLE 2D-ONLY MODE (STRICT)
 
    - Inside `construct(self)`, when you need multiple lines of text, define a small helper like:
 
-     def safe_text_block(lines, font_size=32, line_buff=0.35):
-         group = VGroup()
-         for line in lines:
-             t = Text(line, font_size=font_size, color=WHITE)
-             # Prevent horizontal overflow
-             t.scale_to_fit_width(config.frame_width - 1.5)
-             group.add(t)
+     def safe_text_block(
+    lines,
+    font_size=24,
+    line_buff=0.35,
+    color=WHITE,
+    max_chars=75
+):
+    group = VGroup()
 
-         # Arrange vertically with spacing
-         group.arrange(DOWN, aligned_edge=LEFT, buff=line_buff)
+    for line in lines:
+        wrapped_lines = wrap_text(str(line), max_chars=max_chars)
 
-         # Prevent vertical overflow
-         max_h = config.frame_height - 2
-         if group.height > max_h:
-             group.scale_to_fit_height(max_h)
+        for wl in wrapped_lines:
+            t = Text(
+                wl,
+                font_size=font_size,
+                color=color
+            )
+            group.add(t)
 
-         # Position nicely in the frame (left and upper area)
-         group.to_edge(LEFT, buff=1)
-         group.to_edge(UP, buff=1.5)
+    group.arrange(DOWN, aligned_edge=LEFT, buff=line_buff)
 
-         return group
+    # Giới hạn chiều cao khung hình
+    max_height = config.frame_height - 2
+    if group.height > max_height:
+        group.scale_to_fit_height(max_height)
+
+    group.to_edge(LEFT, buff=1)
+    group.to_edge(UP, buff=1)
+
+    return group
+
+
 
    - When you have several related textual lines:
      - Create a Python list: `lines = ["...", "...", "..."]`
      - Call `safe_text_block(lines)` to get a `VGroup`.
      - Animate it with `self.play(Write(group))` or reveal each element in `group` one by one.
-   - **Never** let long text run freely without scaling: for any long Vietnamese/English sentence, ensure `scale_to_fit_width` is used (either directly or via `safe_text_block`).
-   - Keep font sizes moderate (e.g., `Text(..., font_size=26–48)`) to avoid overflow.
+   - **Never rely on scale_to_fit_width for wrapping.**
+     Always split long text into wrapped lines before creating Text objects using `safe_text_block()`.
+   - Keep font sizes moderate (e.g., `Text(..., font_size=26)`) to avoid overflow.
    - Keep explanatory text, calculations, and visual diagrams separated in space to avoid overlap (for example, place formulas slightly below or to the side of text blocks).
 
 8) **Flow (Minimal & Clear)**
@@ -633,12 +674,57 @@ SIMPLE 2D-ONLY MODE (STRICT)
    - Make sure that your code match with the concept we are tring to visualize.
    - The visualization must be correct and reflect the topic being shown since this will affect the learning outcome.
    - Avoid using uncommon parameters and methods in your code.
+   - **CRITICAL: Never write standalone transformation statements such as:**
+     `obj.shift(...)`, `obj.scale(...)`, `obj.move_to(...)`, `obj.rotate(...)`
+     All transformations MUST be inside `self.play(obj.animate.shift(...))` or `self.play(Transform(...))`.
+     Standalone statements cause IndentationError and will crash the renderer.
 
 11) **Consistency with the Planner’s Example**
    - **Do not change** numeric values or scenario details present in this scene plan (this preserves cross-scene example consistency).
    - Keep variable names identical to `"target"` (post-sanitization) across all actions in this scene.
 
 12) **DO NOT INCLUDE BACKTICKS (``) IN YOUR CODE, EVER!**
+
+13) **CRITICAL SYNTAX RULE - BRACKET BALANCE (MANDATORY)**
+   - Before finishing the response, you MUST re-check that:
+     - Every `(` has a matching `)`
+     - Every `[` has a matching `]`
+     - Every `{` has a matching `}`
+     - Every function or class call is fully closed
+   - **Never leave a `Text(`, `MathTex(`, `VGroup(`, or list `[` unclosed.**
+   - Missing brackets cause SyntaxError and will crash the entire render pipeline.
+   - Count brackets manually before submitting: open_count == close_count for each type.
+
+14) **CRITICAL PYTHON SAFETY RULE - SINGLE LINE LISTS AND CALLS (MANDATORY)**
+   - **NEVER create Python lists using multi-line syntax like:**
+     ```
+     lines = [
+       "a",
+       "b"
+     ]
+     ```
+   - **NEVER create function calls spanning multiple lines.**
+   - **ALL lists MUST be written in ONE SINGLE LINE.**
+   - **ALL function calls MUST be written in ONE SINGLE LINE.**
+   
+   **Example (CORRECT):**
+   ```python
+   lines = ["a", "b", "c"]
+   text = safe_text_block(lines)
+   ```
+   
+   **Example (WRONG - DO NOT USE):**
+   ```python
+   lines = [
+       "a",
+       "b"
+   ]
+   text = safe_text_block(
+       lines
+   )
+   ```
+   
+   📌 Multi-line lists/calls are the #1 cause of missing brackets. Always use single-line format.
 
 **GUIDELINE**:
 - Skim through the scence and think of a draft version.
@@ -650,30 +736,47 @@ OUTPUT FORMAT (MANDATORY)
 ============================================================
 <manim>
 from manim import *
+import textwrap
+
+# Helper function for text wrapping
+def wrap_text(text, max_chars=75):
+    return textwrap.wrap(text, width=max_chars)
 
 # Helper ALWAYS required in EVERY scene
-def safe_text_block(lines, font_size=28, line_buff=0.33, color=WHITE):
+def safe_text_block(
+    lines,
+    font_size=24,
+    line_buff=0.35,
+    color=WHITE,
+    max_chars=75
+):
     group = VGroup()
-    for line in lines:
-        t = Text(str(line), font_size=font_size, color=color)
-        # Prevent horizontal overflow
-        t.scale_to_fit_width(config.frame_width - 1.5)
-        group.add(t)
 
-    # Arrange vertically
+    for line in lines:
+        wrapped_lines = wrap_text(str(line), max_chars=max_chars)
+
+        for wl in wrapped_lines:
+            t = Text(
+                wl,
+                font_size=font_size,
+                color=color
+            )
+            group.add(t)
+
     group.arrange(DOWN, aligned_edge=LEFT, buff=line_buff)
 
-    # Prevent vertical overflow
-    if group.height > config.frame_height - 1.5:
-        group.scale_to_fit_height(config.frame_height - 1.5)
+    # Giới hạn chiều cao khung hình
+    max_height = config.frame_height - 2
+    if group.height > max_height:
+        group.scale_to_fit_height(max_height)
 
-    # Position safely on screen
     group.to_edge(LEFT, buff=1)
     group.to_edge(UP, buff=1)
 
     return group
 
-class {class_name}(Scene):
+
+class $class_name(Scene):
     def construct(self):
         self.wait(2)
 </manim>
@@ -689,6 +792,9 @@ class {class_name}(Scene):
             # Step 1: Generate scene plans
             scene_plans, response_json = self._generate_scene_plans(concept_analysis)
             self.logger.info(f"Generated {len(scene_plans)} scene plans")
+
+            # Lưu mapping scene_id -> ScenePlan để hỗ trợ retry khi code bị vỡ syntax
+            self._scene_plans_by_id: Dict[str, ScenePlan] = {plan.id: plan for plan in scene_plans}
 
             # Save scene plans for debugging
             self._save_scene_plans(scene_plans, concept_analysis, response_json)
@@ -815,7 +921,8 @@ class {class_name}(Scene):
                 self.logger.debug(f"First action parameters: {scene_plan.actions[0].parameters if scene_plan.actions else 'N/A'}")
 
                 try:
-                    formatted_prompt = self.CODE_GENERATION_PROMPT.format(
+                    template = Template(self.CODE_GENERATION_PROMPT)
+                    formatted_prompt = template.safe_substitute(
                         scene_plan=scene_plan_json,
                         class_name=class_name,
                         target_duration="25-30"
@@ -934,6 +1041,30 @@ class {class_name}(Scene):
 
         return "", "failed"
 
+    def _count_brackets(self, line: str) -> Dict[str, int]:
+        """Count brackets in line, ignoring brackets inside strings"""
+        in_string = False
+        escaped = False
+        quote_char = None
+        count = {"(": 0, ")": 0, "[": 0, "]": 0, "{": 0, "}": 0}
+
+        for ch in line:
+            if ch == "\\" and not escaped:
+                escaped = True
+                continue
+            if ch in ("'", '"') and not escaped:
+                if not in_string:
+                    in_string = True
+                    quote_char = ch
+                elif ch == quote_char:
+                    in_string = False
+                    quote_char = None
+            if not in_string and ch in count:
+                count[ch] += 1
+            escaped = False
+
+        return count
+
     def _clean_manim_code(self, code: str) -> str:
         """Clean Manim code by removing markdown, tags and stray explanations."""
 
@@ -950,25 +1081,95 @@ class {class_name}(Scene):
         # 4. Reduce excessive blank lines
         code = re.sub(r'\n{3,}', '\n\n', code)
 
-        # 5. Filter valid Python code lines
+        # 5. Filter valid Python code lines (FIX: prevent IndentationError + handle multi-line blocks)
         cleaned_lines = []
+        in_construct = False
+        open_brackets = 0  # Track multi-line blocks: ( [ {
+        
         for line in code.splitlines():
             stripped = line.lstrip()
 
+            # Count open/close brackets for multi-line block tracking (ignore brackets in strings)
+            counts = self._count_brackets(stripped)
+            open_brackets += counts["("] + counts["["] + counts["{"]
+            open_brackets -= counts[")"] + counts["]"] + counts["}"]
+            # Ensure it doesn't go negative (handles edge cases)
+            open_brackets = max(0, open_brackets)
+
+            # Empty lines and comments
             if stripped == "":
                 cleaned_lines.append("")
                 continue
             if stripped.startswith("#"):
                 cleaned_lines.append(line)
                 continue
-            if stripped.startswith(("from ", "import ", "class ", "@")):
-                cleaned_lines.append(line)
+
+            # Standalone string literals (likely narration or raw text) that are not
+            # part of an open bracketed construct (list/call/dict) often cause
+            # "SyntaxError: invalid syntax. Perhaps you forgot a comma?". These
+            # lines are safe to drop because they are not bound to any variable
+            # and would not affect the rendered animation.
+            if (
+                open_brackets == 0
+                and (stripped.startswith('"') or stripped.startswith("'"))
+                and (stripped.endswith('"') or stripped.endswith("'"))
+                and "=" not in stripped
+                and ":" not in stripped
+            ):
+                # Skip bare string literal line
                 continue
-            if line.startswith((" ", "\t")):
+
+            # Top-level statements (imports, class, decorators)
+            if stripped.startswith(("from ", "import ", "class ", "@", "def ")):
+                if stripped.startswith("def construct"):
+                    in_construct = True
+                elif stripped.startswith("def ") and not stripped.startswith("def construct"):
+                    in_construct = False
                 cleaned_lines.append(line)
                 continue
 
-            # Skip narration/plain text
+            # 👉 NẾU đang ở trong block nhiều dòng → GIỮ TẤT CẢ
+            if open_brackets > 0:
+                cleaned_lines.append(line)
+                continue
+
+            # Inside construct method: only allow valid statements
+            if in_construct:
+                # 🔒 Enforce mandatory text flow: auto FadeOut previous text
+                if stripped.startswith("self.play(Write("):
+                    cleaned_lines.append(line)
+                    cleaned_lines.append("        self.wait(2)")
+                    cleaned_lines.append("        self.play(FadeOut(" + stripped[len("self.play(Write("):-2] + "))")
+                    continue
+                # Allow self.play, self.add, self.wait, self.remove
+                if stripped.startswith(("self.", "for ", "if ", "elif ", "else:", "with ", "try:", "except", "while ", "return ")):
+                    cleaned_lines.append(line)
+                    continue
+                
+                # Allow variable assignments (obj = ...)
+                if "=" in stripped and line.startswith((" ", "\t")):
+                    cleaned_lines.append(line)
+                    continue
+                
+                # ❌ REJECT standalone transformation statements like: obj.shift(UP)
+                # These cause IndentationError - must be inside self.play()
+                if any(method in stripped for method in [".shift(", ".scale(", ".move_to(", ".rotate(", ".fade_in(", ".fade_out("]):
+                    continue
+                
+                # Allow other valid indented statements
+                if line.startswith((" ", "\t")) and stripped:
+                    # Additional check: must start with valid Python keyword or self.
+                    if stripped.startswith(("self.", "for ", "if ", "elif ", "else:", "with ", "try:", "except", "while ", "return ", "pass", "break", "continue")):
+                        cleaned_lines.append(line)
+                    continue
+
+            # Outside construct: allow function definitions and top-level code
+            if not in_construct:
+                if stripped.startswith(("def ", "class ")):
+                    cleaned_lines.append(line)
+                    continue
+
+            # Skip narration/plain text and invalid statements
             continue
 
         code = "\n".join(cleaned_lines).strip()
@@ -977,27 +1178,38 @@ class {class_name}(Scene):
         if "from manim import *" not in code:
             code = "from manim import *\n" + code
 
-        # 7. Insert safe_text_block if missing
-        if "def safe_text_block" not in code:
+        # 7. Insert safe_text_block if missing (check both function and wrap_text to avoid duplicates)
+        if "def safe_text_block" not in code and "def wrap_text" not in code:
             safe_block = """
 # Safe text block to prevent overflow & overlapping
-def safe_text_block(lines, font_size=28, line_buff=0.3, color=WHITE, max_width=None, max_height=None):
-    group = VGroup()
-    frame_w = config.frame_width
-    frame_h = config.frame_height
+import textwrap
 
-    if max_width is None:
-        max_width = frame_w - 1.5
-    if max_height is None:
-        max_height = frame_h - 1.5
+def wrap_text(text, max_chars=75):
+    return textwrap.wrap(text, width=max_chars)
+
+def safe_text_block(
+    lines,
+    font_size=24,
+    line_buff=0.35,
+    color=WHITE,
+    max_chars=75
+):
+    group = VGroup()
 
     for line in lines:
-        t = Text(str(line), font_size=font_size, color=color)
-        t.scale_to_fit_width(max_width)
-        group.add(t)
+        wrapped_lines = wrap_text(str(line), max_chars)
+
+        for wl in wrapped_lines:
+            t = Text(
+                wl,
+                font_size=font_size,
+                color=color
+            )
+            group.add(t)
 
     group.arrange(DOWN, aligned_edge=LEFT, buff=line_buff)
 
+    max_height = config.frame_height - 2
     if group.height > max_height:
         group.scale_to_fit_height(max_height)
 
@@ -1006,9 +1218,83 @@ def safe_text_block(lines, font_size=28, line_buff=0.3, color=WHITE, max_width=N
 
     return group
 """
-            code = code.replace("from manim import *", "from manim import *\n" + safe_block)
+            code = code.replace(
+                "from manim import *",
+                "from manim import *\n" + safe_block
+            )
+
+        # Note: Syntax validation (bracket balance + py_compile) is done in _syntax_check()
+        # before rendering, not here. This function only cleans the code.
+        return code
+
+    def _check_brackets_balance(self, code: str) -> bool:
+        """Check if all brackets are balanced: (), [], {}"""
+        pairs = {"(": ")", "[": "]", "{": "}"}
+        stack = []
+        for ch in code:
+            if ch in pairs:
+                stack.append(ch)
+            elif ch in pairs.values():
+                if not stack or pairs[stack.pop()] != ch:
+                    return False
+        return len(stack) == 0
+
+    def _auto_close_simple_blocks(self, code: str) -> str:
+        """Auto-close simple missing brackets at the end of code.
+        
+        This handles cases where LLM forgot to close brackets in simple scenarios
+        (e.g., missing closing ] or ) at the end of a list/function call).
+        Only closes if brackets are clearly missing at the end and the imbalance
+        is very small (at most 1), otherwise we fail fast.
+        """
+        open_paren = code.count("(") - code.count(")")
+        open_brack = code.count("[") - code.count("]")
+
+        # 🔒 Chỉ vá lỗi rất nhỏ (thiếu tối đa 1 ngoặc ở cuối file)
+        if 0 < open_brack <= 1:
+            self.logger.info("Auto-closing 1 missing ']' bracket at end of code")
+            code += "\n]"
+        if 0 < open_paren <= 1:
+            self.logger.info("Auto-closing 1 missing ')' bracket at end of code")
+            code += "\n)"
+
+        # Nếu mất cân bằng lớn hơn 1 → code quá vỡ, không cố vá
+        if abs(open_paren) > 1 or abs(open_brack) > 1:
+            raise SyntaxError(
+                "Severely malformed code (too many unbalanced brackets). Retry LLM."
+            )
 
         return code
+
+    def _syntax_check(self, code: str, scene_name: str) -> None:
+        """Pre-flight syntax check using py_compile to catch missing brackets early.
+        
+        This is the ONLY place where syntax validation should happen - after code
+        has been fully cleaned and assembled, right before rendering.
+        """
+        # Try auto-healing very small bracket issues first (at most 1 bracket)
+        code = self._auto_close_simple_blocks(code)
+        
+        # Optional: Log bracket balance as warning (for debugging), but don't fail here
+        # py_compile will catch actual syntax errors
+        if not self._check_brackets_balance(code):
+            self.logger.warning(f"Unbalanced brackets detected in scene {scene_name} (will be caught by py_compile)")
+        
+        try:
+            # Use context manager with delete=True for automatic cleanup
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=True, encoding='utf-8') as f:
+                f.write(code)
+                f.flush()  # Ensure data is written before compile
+                # Compile to check syntax (raises SyntaxError if invalid)
+                py_compile.compile(f.name, doraise=True)
+                
+        except py_compile.PyCompileError as e:
+            self.logger.error(f"Syntax error detected in scene {scene_name}: {e}")
+            raise SyntaxError(f"Invalid Python syntax in scene {scene_name}: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error during syntax check for {scene_name}: {e}")
+            raise 
+
 
 
     def _sanitize_class_name(self, scene_id: str) -> str:
@@ -1062,7 +1348,46 @@ def safe_text_block(lines, font_size=28, line_buff=0.3, color=WHITE, max_width=N
             output_filename = f"{scene_code.scene_id}_{scene_code.scene_name}.mp4"
 
             try:
-                # Use renderer to create the video
+                # 🛡️ Pre-flight syntax check using py_compile (catches missing brackets)
+                self._syntax_check(scene_code.manim_code, scene_code.scene_name)
+
+            except SyntaxError as e:
+                # Code bị vỡ cấu trúc nặng → thử gọi lại LLM cho scene này
+                self.logger.error(f"Syntax error before rendering {scene_code.scene_name}: {e}")
+                retry_ok = self._retry_llm_for_scene(scene_code, reason=str(e))
+
+                if not retry_ok:
+                    render_results.append(RenderResult(
+                        scene_id=scene_code.scene_id,
+                        success=False,
+                        error_message=str(e)
+                    ))
+                    continue
+
+                # Sau khi retry, chạy lại syntax check với code mới
+                try:
+                    self._syntax_check(scene_code.manim_code, scene_code.scene_name)
+                except Exception as final_e:
+                    self.logger.error(f"Rendering failed after retry for {scene_code.scene_name}: {final_e}")
+                    render_results.append(RenderResult(
+                        scene_id=scene_code.scene_id,
+                        success=False,
+                        error_message=str(final_e)
+                    ))
+                    continue
+
+            except Exception as e:
+                # Các lỗi khác trong bước syntax check
+                self.logger.error(f"Unexpected error during syntax check for {scene_code.scene_name}: {e}")
+                render_results.append(RenderResult(
+                    scene_id=scene_code.scene_id,
+                    success=False,
+                    error_message=str(e)
+                ))
+                continue
+
+            # Nếu tới đây, code đã qua syntax check an toàn → tiến hành render
+            try:
                 render_result = self.renderer.render(
                     manim_code=scene_code.manim_code,
                     scene_name=scene_code.scene_name,

@@ -226,10 +226,14 @@ def _build_course_text(record) -> str:
     return "\n".join(lines)
 
 
-def build_concept_from_course_code(code: str) -> str | None:
+def build_concept_from_course_code(code: str, language: str = "Vietnamese") -> str | None:
     """
     Lấy full thông tin học phần từ Neo4j (giống hàm test())
     rồi build thành concept natural language cho pipeline.run(...)
+    
+    Args:
+        code: Mã học phần (ví dụ: 'MAN104')
+        language: Ngôn ngữ cho video ('Vietnamese' hoặc 'English')
     """
     query = """
     MATCH (c:Course {code: $code})
@@ -272,14 +276,76 @@ def build_concept_from_course_code(code: str) -> str | None:
 
     course_text = _build_course_text(record)
 
-    # concept cuối cùng: 1 câu chỉ đạo + full syllabus text
-    concept = (
-        "Tạo một video giáo dục 3–5 phút, bằng tiếng Việt, giới thiệu học phần dưới đây. "
-        "Video cần trình bày mục tiêu học phần, chuẩn đầu ra (CLOs), cấu trúc các chủ đề, "
-        "phương pháp giảng dạy, hình thức đánh giá và ý nghĩa của môn học đối với sinh viên. "
-        "Dựa trên toàn bộ thông tin chi tiết sau đây:\n\n"
-        f"{course_text}"
-    )
+    # Build concept header based on language
+    if language == "English":
+        concept_header = (
+    "Create a 3–5 minute educational video in English introducing the course "
+    "STRICTLY based on the backend data provided below.\n\n"
+
+    "MANDATORY REQUIREMENTS:\n"
+    "- The video MUST be divided into 7 to 10 scenes (no fewer than 7 scenes).\n"
+    "- Each scene must focus on ONE clear group of information only.\n"
+    "- DO NOT omit any information if it exists in the backend data.\n"
+    "- DO NOT invent or assume information that is not provided.\n"
+    "- Use short bullet-style phrases. Avoid long paragraphs.\n\n"
+
+    "REQUIRED SCENE STRUCTURE:\n"
+    "Scene 1: Course overview (course name, English name, course code, level, credits, knowledge block).\n"
+    "Scene 2: Course objectives.\n"
+    "Scene 3: Course Learning Outcomes (CLOs) and related PLOs / PIs.\n"
+    "Scene 4: Course content summary.\n"
+    "Scene 5: Course structure – main topics and lessons.\n"
+    "Scene 6: Teaching methods.\n"
+    "Scene 7: Assessment methods and grading weights.\n"
+    "Scene 8: Prerequisite course(s).\n"
+    "Scene 9 (if applicable): Lecturer(s) in charge.\n"
+    "Scene 10 (if needed): Course value, skills gained, and career relevance.\n\n"
+
+    "CONTENT GENERATION GUIDELINES:\n"
+    "- If a scene contains many items (e.g., CLOs or Topics), summarize them clearly "
+    "while preserving the core meaning from the backend.\n"
+    "- Prefer concise bullet points.\n"
+    "- Do NOT merge multiple scenes into one.\n\n"
+
+    "The detailed backend course information is provided below:\n\n"
+)
+
+    else:
+        # Default to Vietnamese
+        concept_header = (
+    "Tạo một video giáo dục dài 3–5 phút, bằng tiếng Việt, giới thiệu học phần dựa HOÀN TOÀN "
+    "trên dữ liệu backend được cung cấp bên dưới.\n\n"
+
+    "YÊU CẦU BẮT BUỘC:\n"
+    "- Video PHẢI được chia thành từ 7 đến 10 scene (không ít hơn 7).\n"
+    "- Mỗi scene trình bày MỘT nhóm thông tin rõ ràng.\n"
+    "- KHÔNG được bỏ sót bất kỳ thông tin nào nếu backend có cung cấp.\n"
+    "- Không tự bịa thêm nội dung ngoài dữ liệu backend.\n"
+    "- Văn bản ngắn gọn, gạch đầu dòng, tránh đoạn văn dài.\n\n"
+
+    "CẤU TRÚC SCENE BẮT BUỘC:\n"
+    "Scene 1: Thông tin tổng quan học phần (tên, tên tiếng Anh, mã, tín chỉ, trình độ, khối kiến thức).\n"
+    "Scene 2: Mục tiêu học phần.\n"
+    "Scene 3: Chuẩn đầu ra học phần (CLOs) và PLO/PI liên quan.\n"
+    "Scene 4: Tóm tắt nội dung học phần.\n"
+    "Scene 5: Cấu trúc môn học – các bài học/chủ đề chính.\n"
+    "Scene 6: Phương pháp giảng dạy.\n"
+    "Scene 7: Hình thức và trọng số đánh giá học phần.\n"
+    "Scene 8: Học phần tiên quyết.\n"
+    "Scene 9 (nếu còn nội dung): Giảng viên phụ trách.\n"
+    "Scene 10 (nếu cần): Ý nghĩa học phần và kỹ năng sinh viên đạt được.\n\n"
+
+    "LƯU Ý KHI SINH NỘI DUNG:\n"
+    "- Nếu một scene có nhiều dữ liệu (ví dụ CLOs hoặc Topics), hãy trình bày chọn lọc, "
+    "nhưng vẫn phản ánh đầy đủ ý chính từ backend.\n"
+    "- Ưu tiên liệt kê theo bullet.\n"
+    "- Không gộp nhiều scene thành một.\n\n"
+
+    "Dữ liệu chi tiết học phần như sau:\n\n"
+)
+
+
+    concept = concept_header + course_text
 
     return concept
 
@@ -305,8 +371,8 @@ def generate_animation(
     # Lấy mã môn từ chuỗi, ví dụ: 'MAN104 - ...' -> 'MAN104'
     course_code = selected_course.split("-")[0].strip()
 
-    # Xây dựng concept từ Neo4j
-    concept = build_concept_from_course_code(course_code)
+    # Xây dựng concept từ Neo4j với ngôn ngữ đã chọn
+    concept = build_concept_from_course_code(course_code, language)
     if not concept:
         return None
 
@@ -330,39 +396,121 @@ def generate_animation(
 
 
 # ==========================
-# 3. GRADIO UI
+# 3. GRADIO UI – HUTECH STYLE
 # ==========================
+
+custom_css = """
+body {
+    background-color: #F4F6F9;
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+}
+
+.hutech-header {
+    background: linear-gradient(90deg, #0054A6, #003F7D);
+    padding: 20px;
+    border-radius: 12px;
+    color: white;
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.hutech-header h1 {
+    margin-bottom: 5px;
+    font-size: 32px;
+}
+
+.hutech-header p {
+    font-size: 16px;
+    opacity: 0.9;
+}
+
+.hutech-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+}
+
+.hutech-step {
+    color: #0054A6;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+button.primary {
+    background-color: #0054A6 !important;
+    border-radius: 8px !important;
+    font-size: 16px !important;
+}
+
+button.primary:hover {
+    background-color: #003F7D !important;
+}
+
+.footer-note {
+    text-align: center;
+    font-size: 14px;
+    color: #6B7280;
+    margin-top: 20px;
+}
+"""
 
 course_choices = get_course_options()
 
-with gr.Blocks(title="STEMViz") as demo:
-    gr.Markdown("# STEMViz – Course to Animation")
-    gr.Markdown(
-        "Chọn một học phần từ Neo4j, hệ thống sẽ tạo video giáo dục từ dữ liệu chương trình đào tạo."
-    )
+with gr.Blocks(
+    title="STEMViz – HUTECH",
+    css=custom_css
+) as demo:
+
+    # ===== HEADER =====
+    gr.HTML("""
+    <div class="hutech-header">
+        <h1>🎓 STEMViz – HUTECH</h1>
+        <p>Hệ thống tạo video bài giảng tự động từ chương trình đào tạo</p>
+    </div>
+    """)
 
     with gr.Row():
-        with gr.Column():
-            course_dropdown = gr.Dropdown(
-                choices=course_choices,
-                label="Chọn học phần (Course)",
-                value=course_choices[0] if course_choices else None,
-                interactive=True
-            )
+        # ===== LEFT COLUMN =====
+        with gr.Column(scale=1):
+            gr.Markdown("### 📘 Thông tin học phần")
+            with gr.Group(elem_classes="hutech-card"):
+                gr.Markdown("<div class='hutech-step'>Bước 1: Chọn học phần</div>")
+                course_dropdown = gr.Dropdown(
+                    choices=course_choices,
+                    label="Học phần",
+                    value=course_choices[0] if course_choices else None
+                )
 
-            language_dropdown = gr.Dropdown(
-                choices=["Vietnamese"],
-                value="Vietnamese",
-                label="Narration Language"
-            )
+                language_dropdown = gr.Dropdown(
+    choices=["Vietnamese", "English"],
+    value="Vietnamese",
+    label="Ngôn ngữ thuyết minh"
+)
 
-            generate_btn = gr.Button("Generate Animation", variant="primary")
 
-    with gr.Row():
-        video_output = gr.Video(
-            label="Generated Animation",
-            autoplay=True
-        )
+                generate_btn = gr.Button(
+                    "🎬 Tạo video bài giảng",
+                    variant="primary"
+                )
+
+        # ===== RIGHT COLUMN =====
+        with gr.Column(scale=1):
+            gr.Markdown("### 📺 Video bài giảng")
+            with gr.Group(elem_classes="hutech-card"):
+                video_output = gr.Video(
+                    label="Video học tập",
+                    autoplay=True
+                )
+
+    # ===== FOOTER =====
+    gr.HTML("""
+    <div class="footer-note">
+        © 2025 HUTECH – Trường Đại học Công nghệ TP.HCM<br>
+        Ứng dụng AI trong giáo dục STEM
+    </div>
+    """)
 
     generate_btn.click(
         fn=generate_animation,
@@ -372,3 +520,4 @@ with gr.Blocks(title="STEMViz") as demo:
 
 if __name__ == "__main__":
     demo.launch(share=False, inbrowser=True)
+
