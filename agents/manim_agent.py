@@ -117,6 +117,10 @@ class ManimAgent(BaseAgent):
     After every Write(...) of any text object,
     you MUST FadeOut that object before writing another text object.
     Never keep more than one text block visible at the same time.
+    
+    8. **Text Blocks (Clarity)**:
+       - Limit each text block to a maximum of 4 short lines.
+       - Avoid long paragraphs in a single scene; if necessary, split content across multiple scenes.
 
 **OUTPUT FORMAT**:
 Return ONLY valid JSON matching this exact structure:
@@ -538,6 +542,9 @@ SIMPLE 2D-ONLY MODE (STRICT)
    - **No updaters** (no `add_updater`, no `always_redraw`).
    - **No ValueTracker / DecimalNumber**; keep logic static and stepwise.
    - **No config edits**, no camera/frame changes, no run_time tweaks (use `self.wait()` only).
+   - **NEVER use Image or ImageMobject.**
+   - **NEVER reference external image files or paths.**
+   - Logos or icons must be represented using `Text` or simple shapes (`Rectangle`, `Circle`, `VGroup`).
 
 1) **Imports**
    - Always start with: `from manim import *`
@@ -620,7 +627,7 @@ WRONG (causes overlapping text):
     font_size=24,
     line_buff=0.35,
     color=WHITE,
-    max_chars=75
+    max_chars=70
 ):
     group = VGroup()
 
@@ -706,11 +713,15 @@ WRONG (causes overlapping text):
    - **NEVER create function calls spanning multiple lines.**
    - **ALL lists MUST be written in ONE SINGLE LINE.**
    - **ALL function calls MUST be written in ONE SINGLE LINE.**
+   - When creating a Python list of strings, EVERY item MUST be separated by a comma.
+   - NEVER place two string literals adjacent to each other inside a list (this misses a comma and crashes Python).
+   - Function calls MUST keep all parameters on the SAME line; do not split parameters across lines.
    
    **Example (CORRECT):**
    ```python
    lines = ["a", "b", "c"]
    text = safe_text_block(lines)
+   t = Text("abc", font_size=28, color=WHITE)
    ```
    
    **Example (WRONG - DO NOT USE):**
@@ -722,9 +733,32 @@ WRONG (causes overlapping text):
    text = safe_text_block(
        lines
    )
+   # Missing comma between adjacent strings (also WRONG):
+   lines = ["a" "b"]
+   # Function call split across lines (WRONG):
+   Text(
+       "abc",
+       font_size=28,
+       color=WHITE
+   )
    ```
    
    📌 Multi-line lists/calls are the #1 cause of missing brackets. Always use single-line format.
+   
+   CRITICAL PYTHON RULE (ABSOLUTE):
+   - NEVER write multi-line Python lists.
+   - NEVER write multi-line function calls.
+   - ALL lists and function calls MUST be written on ONE SINGLE LINE.
+   - Example:
+     safe_text_block(["CLO1", "CLO2", "CLO3"], font_size=26)
+     self.play(Write(text_block), run_time=2)
+   FINAL ABSOLUTE RULE (DO NOT VIOLATE):
+   - Do NOT write function calls across multiple lines.
+   - Do NOT write Python lists with `[` and `]` on different lines.
+   - If a list or call would exceed one line, SHORTEN THE TEXT instead.
+   - Only acceptable form:
+       lines = ["CLO 1", "CLO 2", "CLO 3"]
+       text = safe_text_block(lines, font_size=24, color=WHITE)
 
 **GUIDELINE**:
 - Skim through the scence and think of a draft version.
@@ -739,16 +773,16 @@ from manim import *
 import textwrap
 
 # Helper function for text wrapping
-def wrap_text(text, max_chars=75):
+def wrap_text(text, max_chars=70):
     return textwrap.wrap(text, width=max_chars)
 
-# Helper ALWAYS required in EVERY scene
+# Helper ALWAYS required in EVERY sceness
 def safe_text_block(
     lines,
     font_size=24,
     line_buff=0.35,
     color=WHITE,
-    max_chars=75
+    max_chars=70
 ):
     group = VGroup()
 
@@ -942,7 +976,9 @@ class $class_name(Scene):
                         "- ALL function calls must be SINGLE LINE.\n"
                         "- NEVER place string literals on standalone lines.\n"
                         "- Example: lines = [\"a\", \"b\", \"c\"]\n"
-                        "- Do not break lists or function calls across lines."
+                        "- Do not break lists or function calls across lines.\n"
+                        "- Use safe_text_block([\"...\", \"...\"]) INLINE; do NOT create 'lines = [...]' variables.\n"
+                        "- If content does not fit on one line, SHORTEN THE TEXT instead of splitting across lines."
                     ),
                     temperature=self.config.temperature,
                     max_retries=3
@@ -1112,19 +1148,27 @@ class $class_name(Scene):
                 cleaned_lines.append(line)
                 continue
 
-            # Standalone string literals (likely narration or raw text) that are not
-            # part of an open bracketed construct (list/call/dict) often cause
-            # "SyntaxError: invalid syntax. Perhaps you forgot a comma?". These
-            # lines are safe to drop because they are not bound to any variable
-            # and would not affect the rendered animation.
+            # 🔒 Fix missing comma between adjacent standalone string literals
+            # If a line is a standalone string and the previous kept line ended with a string, append a comma to the previous line
+            try:
+                if stripped.startswith('"') and stripped.endswith('"') and '"' in stripped[1:-1]:
+                    pass  # embedded quotes – skip this heuristic
+                elif stripped.startswith('"') and stripped.endswith('"'):
+                    if cleaned_lines and cleaned_lines[-1].strip().endswith('"'):
+                        cleaned_lines[-1] = cleaned_lines[-1] + ","
+            except Exception:
+                pass
+
+            # Standalone string literals should only be dropped when OUTSIDE construct.
+            # Inside construct, they may be part of list literals or parameters.
             if (
-                open_brackets == 0
+                not in_construct
+                and open_brackets == 0
                 and (stripped.startswith('"') or stripped.startswith("'"))
                 and (stripped.endswith('"') or stripped.endswith("'"))
                 and "=" not in stripped
                 and ":" not in stripped
             ):
-                # Skip bare string literal line
                 continue
 
             # Top-level statements (imports, class, decorators)
@@ -1143,11 +1187,32 @@ class $class_name(Scene):
 
             # Inside construct method: only allow valid statements
             if in_construct:
-                # 🔒 Enforce mandatory text flow: auto FadeOut previous text
+                # Forbid creating 'lines = [' variables (force inline list usage with safe_text_block([...]))
+                if stripped.startswith("lines = ["):
+                    continue
+                # Forbid creating 'objectives = [' to avoid multiline lists for objectives
+                if stripped.startswith("objectives = ["):
+                    continue
+                # Forbid starting a multi-line function call (common source of missing commas)
+                if stripped.endswith("("):
+                    continue
+                # Forbid using MathTex/Tex for normal text (especially Vietnamese) to avoid LaTeX unicode errors
+                if stripped.startswith(("MathTex(", "Tex(")) and any(ch.isalpha() for ch in stripped):
+                    continue
+                # Block external images usage entirely (replace with safe placeholder to avoid NameError)
+                if ("Image(" in stripped) or ("ImageMobject(" in stripped):
+                    # Try to preserve variable name if assigned
+                    m = re.match(r"(\w+)\s*=\s*Image(?:Mobject)?\(", stripped)
+                    indent = line[:len(line) - len(stripped)]
+                    if m:
+                        var_name = m.group(1)
+                        cleaned_lines.append(f"{indent}{var_name} = Text(\"Logo\", font_size=32, color=WHITE)")
+                    else:
+                        cleaned_lines.append(f"{indent}placeholder_logo = Text(\"Logo\", font_size=32, color=WHITE)")
+                    continue
+                # Do not auto-inject FadeOut after Write; let scene logic decide
                 if stripped.startswith("self.play(Write("):
                     cleaned_lines.append(line)
-                    cleaned_lines.append("        self.wait(2)")
-                    cleaned_lines.append("        self.play(FadeOut(" + stripped[len("self.play(Write("):-2] + "))")
                     continue
                 # Allow self.play, self.add, self.wait, self.remove
                 if stripped.startswith(("self.", "for ", "if ", "elif ", "else:", "with ", "try:", "except", "while ", "return ")):
@@ -1192,7 +1257,7 @@ class $class_name(Scene):
 # Safe text block to prevent overflow & overlapping
 import textwrap
 
-def wrap_text(text, max_chars=75):
+def wrap_text(text, max_chars=70):
     return textwrap.wrap(text, width=max_chars)
 
 def safe_text_block(
@@ -1200,7 +1265,7 @@ def safe_text_block(
     font_size=24,
     line_buff=0.35,
     color=WHITE,
-    max_chars=75
+    max_chars=70
 ):
     group = VGroup()
 
@@ -1248,31 +1313,9 @@ def safe_text_block(
         return len(stack) == 0
 
     def _auto_close_simple_blocks(self, code: str) -> str:
-        """Auto-close simple missing brackets at the end of code.
-        
-        This handles cases where LLM forgot to close brackets in simple scenarios
-        (e.g., missing closing ] or ) at the end of a list/function call).
-        Only closes if brackets are clearly missing at the end and the imbalance
-        is very small (at most 1), otherwise we fail fast.
-        """
-        open_paren = code.count("(") - code.count(")")
-        open_brack = code.count("[") - code.count("]")
-
-        # 🔒 Chỉ vá lỗi rất nhỏ (thiếu tối đa 1 ngoặc ở cuối file)
-        if 0 < open_brack <= 1:
-            self.logger.info("Auto-closing 1 missing ']' bracket at end of code")
-            code += "\n]"
-        if 0 < open_paren <= 1:
-            self.logger.info("Auto-closing 1 missing ')' bracket at end of code")
-            code += "\n)"
-
-        # Nếu mất cân bằng lớn hơn 1 → code quá vỡ, không cố vá
-        if abs(open_paren) > 1 or abs(open_brack) > 1:
-            raise SyntaxError(
-                "Severely malformed code (too many unbalanced brackets). Retry LLM."
-            )
-
+        # Do not attempt heuristic fixes; let py_compile be the source of truth
         return code
+
 
     def _syntax_check(self, code: str, scene_name: str) -> None:
         """Pre-flight syntax check using py_compile to catch missing brackets early.
@@ -1415,6 +1458,15 @@ def safe_text_block(
             except SyntaxError as e:
                 # Code bị vỡ cấu trúc nặng → thử gọi lại LLM cho scene này
                 self.logger.error(f"Syntax error before rendering {scene_code.scene_name}: {e}")
+                # Nếu lỗi thuộc dạng 'was never closed' (do multiline list/call), bỏ qua retry để tránh vòng lặp vô ích
+                if "was never closed" in str(e):
+                    self.logger.error("Multiline list/call detected (violates single-line rule). Skipping scene without retry.")
+                    render_results.append(RenderResult(
+                        scene_id=scene_code.scene_id,
+                        success=False,
+                        error_message=str(e)
+                    ))
+                    continue
                 retry_ok = self._retry_llm_for_scene(scene_code, reason=str(e))
 
                 if not retry_ok:
