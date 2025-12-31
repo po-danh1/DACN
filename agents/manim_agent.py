@@ -99,9 +99,9 @@ class ManimAgent(BaseAgent):
    - Typical durations (guideline, adjust as needed):
      - write/create (short text/equation): 4–5s
      - transform/replace (equation/diagram): 8-19s
-     - move/highlight: 3-5s
+     - move/highlight: 3-8s
      - fade_in/out: 2-5s
-     - wait (narration): 2-4s
+     - wait (narration): 3-8s
    - Prefer easing that reads smoothly (ease-in-out). Include `"parameters": {"easing": "ease_in_out"}` when relevant.
 
 6. **Educational Flow**:
@@ -589,11 +589,11 @@ SIMPLE 2D-ONLY MODE (STRICT)
 
 6) **Pacing & Narration (Derived from Plan)**
    - After **every significant action**, insert a pause:  
-     `pause = clamp(round(action.duration * 0.5), 1, 3)` → `self.wait(pause)`
+     `pause = clamp(round(action.duration * 0.5), 5, 10)` → `self.wait(pause)`
    - If an explicit `"wait"` action appears, honor its `"duration"` directly (clamp to [1, 4] if very large).
    - Animations should feel **slow and deliberate**; do **not** chain many animations without waits.
 
-7) **Layout & Text Safety (Anti-overlap)**
+7) **Layout & Text Safety (Anti-overlap)**s
     🚨 ANTI-OVERLAP RULE (MANDATORY):
 
 - At any time, ONLY ONE main text block is allowed on screen.
@@ -666,9 +666,9 @@ WRONG (causes overlapping text):
    - Keep explanatory text, calculations, and visual diagrams separated in space to avoid overlap (for example, place formulas slightly below or to the side of text blocks).
 
 8) **Flow (Minimal & Clear)**
-   - Brief title (2–3s), then step-by-step reveal matching the order of `actions`.
-   - Insert `self.wait(1)` **at minimum** between logical steps if the plan’s duration is missing.
-   - End with `self.wait(2)` holding the final state.
+   - Brief title (5–10s), then step-by-step reveal matching the order of `actions`.
+   - Insert `self.wait(3)` **at minimum** between logical steps if the plan’s duration is missing.
+   - End with `self.wait(5)` holding the final state.
 
 9) **Graceful Downgrades for Heavy Visuals**
    - Large “grids” or thousands of dots: substitute a labeled `Rectangle` or a **small** `VGroup` (≤ 20 dots) plus a label like `"10,000 cases (schematic)"`.
@@ -812,7 +812,7 @@ def safe_text_block(
 
 class $class_name(Scene):
     def construct(self):
-        self.wait(2)
+        self.wait(3)
 </manim>
 """
 
@@ -1214,6 +1214,13 @@ class $class_name(Scene):
                 if stripped.startswith("self.play(Write("):
                     cleaned_lines.append(line)
                     continue
+                
+                if stripped.startswith("self.play(Create(") or stripped.startswith("self.play(FadeIn("):
+                    indent = line[:len(line) - len(stripped)]
+                    cleaned_lines.append(line)
+                    cleaned_lines.append(f"{indent}self.wait(5)")
+                    continue
+
                 # Allow self.play, self.add, self.wait, self.remove
                 if stripped.startswith(("self.", "for ", "if ", "elif ", "else:", "with ", "try:", "except", "while ", "return ")):
                     cleaned_lines.append(line)

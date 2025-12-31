@@ -225,7 +225,16 @@ def _build_course_text(record) -> str:
 
     return "\n".join(lines)
 
+
 def build_concept_from_course_code(code: str, language: str = "Vietnamese") -> str | None:
+    """
+    Lấy full thông tin học phần từ Neo4j (giống hàm test())
+    rồi build thành concept natural language cho pipeline.run(...)
+    
+    Args:
+        code: Mã học phần (ví dụ: 'MAN104')
+        language: Ngôn ngữ cho video ('Vietnamese' hoặc 'English')
+    """
     query = """
     MATCH (c:Course {code: $code})
     OPTIONAL MATCH (kb:KnowledgeBlock)-[:CONTAINS]->(c)
@@ -265,23 +274,90 @@ def build_concept_from_course_code(code: str, language: str = "Vietnamese") -> s
     if not record:
         return None
 
-    # ✅ LUÔN build course_text trước
     course_text = _build_course_text(record)
 
-    # ✅ Build prompt theo ngôn ngữ
+    # Build concept header based on language
     if language == "English":
         concept_header = (
-            "Create a 3–5 minute educational video in English introducing the course, " "STRICTLY based on the backend data provided below.\n\n" "========================\n" "MANDATORY REQUIREMENTS\n" "========================\n" "- The video MUST be divided into EXACTLY 6 scenes.\n" "- Do NOT create more or fewer than 6 scenes.\n" "- Do NOT add any extra scenes beyond the defined structure.\n" "- Each scene must focus on ONE clear group of information only.\n" "- Do NOT omit any information if it exists in the backend data.\n" "- Do NOT invent or assume any information not provided.\n" "- Use concise bullet-style phrases. Avoid long paragraphs.\n\n" "========================\n" "REQUIRED 6-SCENE STRUCTURE\n" "========================\n" "Scene 1: Course overview\n" "- Course name (Vietnamese and English if available)\n" "- Course code\n" "- Academic level\n" "- Total credits\n" "- Knowledge block\n\n" "Scene 2: Course objectives and significance\n" "- Main objectives of the course\n" "- Role and importance of the course in the curriculum\n\n" "Scene 3: Course Learning Outcomes (CLOs) and related PLOs / PIs\n" "- Key CLOs\n" "- Mapping between CLOs and PLOs / PIs (if available)\n\n" "Scene 4: Course content and structure\n" "- Course content summary\n" "- Main topics or lessons\n\n" "Scene 5: Teaching methods and assessment\n" "- Teaching methods\n" "- Assessment methods\n" "- Grading weights\n\n" "Scene 6: Study conditions and lecturer information\n" "- Prerequisite courses (if any)\n" "- Lecturer(s) in charge\n\n" "========================\n" "BACKEND COURSE DATA\n" "========================\n" 
-        )
+        "Create a 3–5 minute educational video in English introducing the course "
+        "STRICTLY based on the backend data provided below.\n\n"
+
+        "MANDATORY REQUIREMENTS:\n"
+        "- The video MUST be divided into EXACTLY 8 scenes (no more, no fewer).\n"
+        "- Each scene MUST focus on ONE clear group of information only.\n"
+        "- DO NOT omit any information if it exists in the backend data.\n"
+        "- DO NOT invent, assume, or add information not provided.\n"
+        "- Use short bullet points. Avoid long paragraphs.\n\n"
+
+        "REQUIRED SCENE STRUCTURE (FIXED – 8 SCENES ONLY):\n"
+        "Scene 1: Course overview "
+        "(course name, English name, course code, level, total credits, knowledge block).\n"
+
+        "Scene 2: Course objectives.\n"
+
+        "Scene 3: Course Learning Outcomes (CLOs) "
+        "and related PLOs / PIs.\n"
+
+        "Scene 4: Course content summary.\n"
+
+        "Scene 5: Course structure – main topics and key concepts.\n"
+
+        "Scene 6: Teaching methods and learning approaches.\n"
+
+        "Scene 7: Assessment methods and grading weights.\n"
+
+        "Scene 8: Prerequisite course(s), lecturer(s) in charge (if available), "
+        "and overall course value / skills gained.\n\n"
+
+        "CONTENT GENERATION GUIDELINES:\n"
+        "- If a scene contains many items (e.g., CLOs or Topics), summarize clearly "
+        "while preserving the original meaning.\n"
+        "- Keep information concise and well-structured.\n"
+        "- DO NOT split or merge scenes.\n\n"
+
+        "The detailed backend course information is provided below:\n\n"
+    )
+
     else:
         concept_header = (
-           "Tạo một video giáo dục dài 3–5 phút, bằng tiếng Việt, giới thiệu học phần " "dựa HOÀN TOÀN trên dữ liệu backend được cung cấp bên dưới.\n\n" "========================\n" "YÊU CẦU BẮT BUỘC\n" "========================\n" "- Video PHẢI được chia thành CHÍNH XÁC 6 scene.\n" "- KHÔNG tạo nhiều hơn hoặc ít hơn 6 scene.\n" "- KHÔNG tự ý tạo thêm scene ngoài cấu trúc đã quy định.\n" "- Mỗi scene chỉ trình bày MỘT nhóm thông tin rõ ràng.\n" "- KHÔNG được bỏ sót thông tin nếu backend có cung cấp.\n" "- KHÔNG bịa đặt hoặc suy đoán nội dung không có trong dữ liệu.\n" "- Văn bản ngắn gọn, gạch đầu dòng, tránh đoạn văn dài.\n\n" "========================\n" "CẤU TRÚC 6 SCENE BẮT BUỘC\n" "========================\n" "Scene 1: Tổng quan học phần\n" "- Tên học phần \n" "- Mã học phần\n" "- Tổng số tín chỉ\n\n" "Scene 2: Mục tiêu và ý nghĩa học phần\n" "- Mục tiêu chính của học phần\n" "- Vai trò và ý nghĩa trong chương trình đào tạo\n\n" "Scene 3: Chuẩn đầu ra học phần (CLOs) và PLO/PI liên quan\n" "- Các CLO chính\n\n" "Scene 4: Nội dung và cấu trúc môn học\n" "- Tóm tắt nội dung học phần\n" "- Các chủ đề/bài học chính\n\n" "Scene 5: Phương pháp giảng dạy và đánh giá\n" "- Phương pháp giảng dạy\n" "- Hình thức đánh giá\n" "- Trọng số đánh giá\n\n" "Scene 6: Điều kiện học tập và giảng viên phụ trách\n" "- Học phần tiên quyết (nếu có)\n" "- Thông tin giảng viên phụ trách\n\n" "========================\n" "DỮ LIỆU BACKEND HỌC PHẦN\n" "========================\n"
-        )
+        "Tạo một video giáo dục dài 3–5 phút, bằng tiếng Việt, giới thiệu học phần "
+        "dựa HOÀN TOÀN trên dữ liệu backend được cung cấp bên dưới.\n\n"
 
-    # ✅ GHÉP CHUỖI & RETURN
+        "YÊU CẦU BẮT BUỘC:\n"
+        "- Video PHẢI được chia thành CHÍNH XÁC 8 scene (không nhiều hơn, không ít hơn).\n"
+        "- Mỗi scene chỉ trình bày MỘT nhóm thông tin rõ ràng.\n"
+        "- KHÔNG được bỏ sót bất kỳ thông tin nào nếu backend có dữ liệu.\n"
+        "- KHÔNG tự suy diễn hoặc thêm nội dung ngoài backend.\n"
+        "- Văn bản ngắn gọn, gạch đầu dòng, tránh đoạn văn dài.\n\n"
+
+        "CẤU TRÚC SCENE CỐ ĐỊNH (8 SCENE):\n"
+        "Scene 1: Tổng quan học phần "
+        "(tên học phần,  mã môn, tổng tín chỉ).\n"
+
+        "Scene 2: Mục tiêu học phần.\n"
+
+        "Scene 3: Tóm tắt nội dung học phần.\n"
+
+        "Scene 4: Cấu trúc môn học – các chủ đề chính và khái niệm trọng tâm.\n"
+
+        "Scene 5: Phương pháp giảng dạy và học tập.\n"
+
+        "Scene 6: Hình thức đánh giá và trọng số điểm.\n"
+
+        "Scene 7: Học phần tiên quyết, giảng viên phụ trách (nếu có)"
+
+        "LƯU Ý KHI SINH NỘI DUNG:\n"
+        "- Trình bày rõ ràng, có cấu trúc.\n"
+        "- KHÔNG tách hoặc gộp scene.\n\n"
+
+        "Dữ liệu chi tiết học phần như sau:\n\n"
+    )
+
+
+
     concept = concept_header + course_text
-    return concept
 
+    return concept
 
 # ==========================
 # 2. PIPELINE
@@ -453,4 +529,3 @@ with gr.Blocks(
 
 if __name__ == "__main__":
     demo.launch(share=False, inbrowser=True)
-
